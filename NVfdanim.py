@@ -173,6 +173,8 @@ pyplot.quiver(X[::2,::2],Y[::2,::2],u[::2,::2],v[::2,::2]) ##plotting velocity
 pyplot.xlabel('X')
 pyplot.ylabel('Y')
 
+fig.savefig('NV.png', bbox_inches='tight')
+pyplot.close(fig)
 pyplot.show()
 
 # fig = pyplot.figure() #If i do pcolor, then no need for 3d projection
