@@ -72,6 +72,8 @@ def animate(i): #i increment with 1 each step
 	#p[i+1,:] = np.dot(Ainv,p[i,:])
 	#ax.plot(x,p)
 	line.set_data(x,p[i+1,:])
+	if i == 3:
+		plt.savefig('heat.png', bbox_inches='tight')
 	return line
 
 anim = animation.FuncAnimation(fig,animate, frames = nt, interval=500)#,blit=False)
