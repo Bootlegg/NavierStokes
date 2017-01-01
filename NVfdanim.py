@@ -33,8 +33,8 @@ f4.write('{0:4.1f} {1:4.1f} {2:4.1f} {3:4.1f} {4:4.1f} {5:4.1f}'\
 
 
 #https://en.wikipedia.org/wiki/Reynolds_number
-#reynolds number over 4000 giver turbulent?
-#må prøve det... se om mit shit det virker til turbulence :P
+#reynolds number over 4000 giver turbulent, ikke sikkert jeg ka bruge det, da det 
+#jo vil give andre værdier for dt mht. stability
 
 #initialize arrays
 p  = numpy.zeros((ny,nx))
@@ -173,7 +173,7 @@ pyplot.quiver(X[::2,::2],Y[::2,::2],u[::2,::2],v[::2,::2]) ##plotting velocity
 pyplot.xlabel('X')
 pyplot.ylabel('Y')
 
-fig.savefig('NV.png', bbox_inches='tight')
+fig.savefig('figs/NV.png', bbox_inches='tight')
 pyplot.close(fig)
 pyplot.show()
 
