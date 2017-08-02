@@ -9,6 +9,7 @@ class funcs:
 	"""
 	A class containing the functions/equations, derivatives and parameters.
 	Perhaps superfluous, could just have seperate functions.
+	
 	"""
 	
 	#Number of iterations. Should change to a while loop and break from some convergence measure.
@@ -25,12 +26,20 @@ class funcs:
 	flist = np.array([])
 
 	#def __init__(self,fu,listofdf):
+	
 	def __init__(self, listoffunctions):
-
-		#Number of equatiomns
+		"""
+		A whole list of functions is initialized at once.
+		You can also add one function at a time though, so it's flexible that way.
+		"""
+		#Number of equations
 		funcs.nequations += len(listoffunctions)
 
-		#Adding functions
+		#Adding functions, we add to funcs.flist
+		#Maybe, funcs.flist shouldn't be a numpy array, actually?
+		#Numpy arrays are probably only faster if we do math on the items themselves.
+		#In this case, we just call each element, because it's a function, not a number...
+		#So, standard python list is probably faster?
 		funcs.flist = np.append(funcs.flist, listoffunctions)
 		
 
@@ -75,7 +84,9 @@ class funcs:
 		#funcs.dfveclist = np.append(funcs.dfveclist, dfvec)
 		
 		dxvec = (x-xold)#np.absolute()
-
+		
+		#Huh? Her laver jeg jo bare en copy af x, basically?
+		#Så altså jeg kan vel bare sige xes = x.copy() right?
 		xes = np.array([])
 		for i in range(funcs.nequations):
 			xes = np.append(xes,x)
@@ -107,9 +118,11 @@ class funcs:
 
 #Really should also pass the guess to this class.
 #Should make this as a call from a function, if possible, since then this script can be converted to a module.
-funcs([lambda x: x[0]**2+x[1]**2-4+2*x[0]*x[1],
+funcs([
+		lambda x: x[0]**2+x[1]**2-4+2*x[0]*x[1],
 		lambda x: 3*x[1]+x[0],
-		lambda x: 3*x[2]**2+2*x[1]*x[0]])
+		lambda x: 3*x[2]**2+2*x[1]*x[0]
+		])
 
 #Guess arrays
 xold = np.zeros(funcs.nequations)+2
@@ -121,43 +134,73 @@ print("List of functions in class")
 print(funcs.flist)
 
 
-
+#I want this to be a function, actually
 #We iterate the guesses using Newtons method, with Jacobi ,matrix
-for n in range(funcs.nt-1):
+def NewtonMethod(xold,x,xnew):
+	for n in range(funcs.nt-1):
 
-	#This could also be called in the class
-	Jacobian = np.array([])
-	for i in range(funcs.nequations):
-		Jacobian = np.append(Jacobian, funcs.gradientf(funcs.flist[i],x,xold))
+		#This could also be called in the class
+		Jacobian = np.array([])
+		for i in range(funcs.nequations):
+			Jacobian = np.append(Jacobian, funcs.gradientf(funcs.flist[i],x,xold))
 
-	Jacobian = np.reshape(Jacobian, (funcs.nequations,funcs.nequations))	
+		Jacobian = np.reshape(Jacobian, (funcs.nequations,funcs.nequations))	
 
+		
+
+		#Need to iterate this system of LINEAR equations myself. Non sparse matrix. Non diagonal.
+		Jinv = np.linalg.inv(Jacobian)
+
+		
+		fvec = np.zeros(funcs.nequations)
+		for i in range(funcs.nequations):
+			fvec[i] = funcs.flist[i](x)
+		
+		#Newtons Method here
+		xnew = x-np.dot(np.array(Jinv),fvec)
+
+		xold = x
+		x = xnew
 	
-
-	#Need to iterate this system of LINEAR equations myself. Non sparse matrix. Non diagonal.
-	Jinv = np.linalg.inv(Jacobian)
-
 	
-	fvec = np.zeros(funcs.nequations)
-	for i in range(funcs.nequations):
-		fvec[i] = funcs.flist[i](x)
 	
- 	#Newtons Method here
-	xnew = x-np.dot(np.array(Jinv),fvec)
-
-	xold = x
-	x = xnew
+def PrintSolution(x):
+	print('Final iterated point, THE SOLUTION')
+	print(x)
 
 
+if __name__=="__main__":
+	
+	
+	#Here i import functions 
+	#funcs([imported.list])
+	funcs([
+		lambda x: x[0]**2+x[1]**2-4+2*x[0]*x[1],
+		lambda x: 3*x[1]+x[0],
+		lambda x: 3*x[2]**2+2*x[1]*x[0]
+		])
+	
+	#Here i make guesses for newtons method
+	#Guess arrays
+	#Actually, xold need to be guessed, but, x doesn't need to be guessed?
+	#Or maybe it does, because we use numerical derivatives... dunno
+	xold = np.zeros(funcs.nequations)+2
+	x = np.zeros(funcs.nequations)+10 #np.zeros(funcs.nequations)+3
+	xnew = np.zeros(funcs.nequations)
+	
+	
+	
+	NewtonMethod(xold,x,xnew)
+	
+	
+	#iterated point
+	PrintSolution(x)
 
-#iterated point
-print('Final iterated point, THE SOLUTION')
-print(x)
+	#function evaluated
+	print('Functions at the iterated point')
 
-#function evaluated
-print('Functions at the iterated point')
-
-n = 0
-for f in funcs.flist:
-	print("f{} = {}".format(n,f(x)))
+	n = 0
+	for f in funcs.flist:
+		print("f{} = {}".format(n,f(x)))
 	n+=1
+	
