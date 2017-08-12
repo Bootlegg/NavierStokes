@@ -14,9 +14,9 @@ import numpy as np
 
 
 
-def MakeCell(Cell,a,b,xrange,indstart):
+def MakeCell(Cell,a,b,xrange,indstart,dx):
 	#y = ax + b
-	dx = 1
+	#dx = 1
 	
 	L = np.sqrt(dx**2+a**2*dx**2)
 	
@@ -88,7 +88,7 @@ def MakeSidesAndNormalVectors(Cell):
 		Cell[index]["Side1"] = Side1
 		
 		Cell[index]["Normalvector1"] = [Cell[index]["Corners"][1][1]-Cell[index]["Corners"][0][1], #dy
-								-(Cell[index]["Corners"][1][0]-Cell[index]["Corners"][0][0])]
+										-(Cell[index]["Corners"][1][0]-Cell[index]["Corners"][0][0])]
 		
 		
 		
@@ -104,7 +104,7 @@ def MakeSidesAndNormalVectors(Cell):
 		
 		
 		Cell[index]["Normalvector2"] = [Cell[index]["Corners"][2][1]-Cell[index]["Corners"][1][1],
-			-(Cell[index]["Corners"][2][0]-Cell[index]["Corners"][1][0])]
+										-(Cell[index]["Corners"][2][0]-Cell[index]["Corners"][1][0])]
 		
 		Side3=[
 		[Cell[index]["Corners"][2][0],Cell[index]["Corners"][3][0]], #x
@@ -299,17 +299,22 @@ def SetSideHeightAndVelocity(Cell,U,v,Nx):
 	En Cell node vil give sin height til højre side af sin Cell.
 	Så, det er "Side2" som skal have U value fra Cell[i]
 	"""
+	print("Setting SideHeight")
 	for i in Cell:
 		Cell[i]["Side1"][2] = 0 #we don't use side1 
 		Cell[i]["Side2"][2] = v
 		Cell[i]["Side3"][2] = 0 #we don't use side3
 		Cell[i]["Side4"][2] = v 
 		
-		if "i" == "0":
+		if int(i) == 0:
 			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
 			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
 			#denne her skal have "U" fra Cell["Nx-1"]
 			Cell["0"]["Side4"][3] = Cell["{}".format(Nx-1)]["U"]
+		
+		#elif int(i) == Nx-1:
+			
+		
 		else:
 			if v > 0:
 				
@@ -319,13 +324,40 @@ def SetSideHeightAndVelocity(Cell,U,v,Nx):
 				Cell[i]["Side3"][3] = 0 #we don't use side3
 				Cell[i]["Side4"][3] = 0 #Cell[i]["U"]
 				
-				
-				#Cell[i] and Cell[i+1] share side/edge/surface, so we duplicate results.
 				if int(i) < Nx-1:
+					#print("True")
+					#Cell["{}".format(int(i)+1)]["Side1"][3] = 0#Cell[i]["Side2"][3]
+					#Cell["{}".format(int(i)+1)]["Side2"][3] = 0#Cell[i]["Side2"][3]
+					#Cell["{}".format(int(i)+1)]["Side3"][3] = 0#Cell[i]["Side2"][3]
 					Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
-			
-		
-
+					
+					
+					#Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["U"]
+					
+					#print("{}".format(int(i)+1))
+					#print(Cell[i]["Side2"][3])
+					#print(Cell["{}".format(int(i)+1)]["Side4"][3])
+					#print(Cell["{}".format(int(i)+1)]["Side4"][3])
+					
+					print(Cell[i]["Side2"][3])
+					print(Cell["{}".format(int(i)+1)]["Side4"][3])
+				#Cell[i] and Cell[i+1] share side/edge/surface, so we duplicate results.
+				#if int(i) < Nx-1:
+					
+	for i in Cell:
+		if int(i) < Nx-1:
+			Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
+	print("Printing side4 height")
+	#De printer alle fucking 0.... makes no sense dude...
+	#JEg sætter dem jo!!! side 4!!!!
+	
+	
+	
+	for i in Cell:
+		print(Cell[i]["Side4"][3])
+		print(Cell["{}".format(int(i))]["Side4"][3])
+		if int(i) < Nx-1:
+			print(Cell["{}".format(int(i)+1)]["Side4"][3])
 			
 		
 		
@@ -337,11 +369,17 @@ def SetFluxDensity(Cell):
 	We want to do it upstream,right?
 	Actually, it's the height initialization that has to be upstream
 	"""
-	for index in Cell:
+	print("Setting FluxDensity")
+	for i in Cell:
 		#Cell[index]["Side1"][4] = Cell[index]["Side1"][3]*Cell[index]["Side1"][2]
-		Cell[index]["Side2"][4] = Cell[index]["Side2"][3]*Cell[index]["Side2"][2]
+		Cell[i]["Side2"][4] = Cell[i]["Side2"][3]*Cell[i]["Side2"][2]
 		#Cell[index]["Side3"][4] = Cell[index]["Side3"][3]*Cell[index]["Side3"][2]
-		Cell[index]["Side4"][4] = Cell[index]["Side4"][3]*Cell[index]["Side4"][2]
+		Cell[i]["Side4"][4] = Cell[i]["Side4"][3]*Cell[i]["Side4"][2]
+		
+		#print(Cell[i]["Side2"][4])
+		#Okay... side4 height er 0...
+		print("Height of side4 {}".format(Cell[i]["Side4"][3]))
+		
 
 
 def UpdateU(Cell,dt):
@@ -349,17 +387,26 @@ def UpdateU(Cell,dt):
 	Continuity equation
 	for 1d in straight line, we use only side2 and side4
 	
+	Unew = U - fac*(FluxDensity2*Vector2 + FluxDensity4*Vector4)
+	
+	[4] er flux density
 	"""
 	for i in Cell:
-		Vfac = dt/Cell[i]["V"]
+		fac = dt/Cell[i]["V"]
 		
-		Cell[i]["Unew"] = Cell[i]["U"]-Vfac*(
+		Cell[i]["Unew"] = Cell[i]["U"]-fac*(
 		Cell[i]["Side2"][4]*Cell[i]["Normalvector2"][0]+
 		Cell[i]["Side4"][4]*Cell[i]["Normalvector4"][0]
 		)
+		
+		
+		print("Side2 -> {}".format(Cell[i]["Side2"][4]*Cell[i]["Normalvector2"][0]))
+
+		print("Side4 -> {}".format(Cell[i]["Side4"][4]*Cell[i]["Normalvector4"][0]))
+
 	
-	for index in Cell:
-		Cell[index]["U"] = Cell[index]["Unew"]
+	for i in Cell:
+		Cell[i]["U"] = Cell[i]["Unew"]
 
 def Updatev(Cell,dt):
 	"""
@@ -383,7 +430,7 @@ if __name__ == "__main__":
 	b = 0
 	#Bør faktisk include x-range.... fordi det er line segments...
 	x1range = np.linspace(0,4,Nx+1)
-	MakeCell(Cell,a,b,x1range,0)
+	MakeCell(Cell,a,b,x1range,0,dx)
 	MakeSidesAndNormalVectors(Cell)
 
 	
@@ -394,10 +441,10 @@ if __name__ == "__main__":
 	SetSideHeightAndVelocity(Cell,U,v,Nx)
 	SetFluxDensity(Cell)
 	
-	for nt in range(6):
+	for nt in range(1):
 		UpdateU(Cell,dt)
-		SetSideHeightAndVelocity(Cell,U,v,Nx)
-		SetFluxDensity(Cell)
+		#SetSideHeightAndVelocity(Cell,U,v,Nx)
+		#SetFluxDensity(Cell)
 		
 		
 	
