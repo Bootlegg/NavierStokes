@@ -307,10 +307,12 @@ def SetSideHeightAndVelocity(Cell,U,v,Nx):
 		Cell[i]["Side4"][2] = v 
 		
 		if int(i) == 0:
+			
 			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
 			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
 			#denne her skal have "U" fra Cell["Nx-1"]
 			Cell["0"]["Side4"][3] = Cell["{}".format(Nx-1)]["U"]
+			Cell["0"]["Side2"][3] = Cell["0"]["U"]
 		
 		#elif int(i) == Nx-1:
 			
@@ -359,8 +361,11 @@ def SetSideHeightAndVelocity(Cell,U,v,Nx):
 		if int(i) < Nx-1:
 			print(Cell["{}".format(int(i)+1)]["Side4"][3])
 			
-		
-		
+	print("Cell 0 sides and heights")
+	print(Cell["0"]["Side2"][2])
+	print(Cell["0"]["Side2"][3])
+	print(Cell["0"]["Side4"][2])
+	print(Cell["0"]["Side4"][3])
 		
 def SetFluxDensity(Cell):
 	"""
@@ -441,10 +446,10 @@ if __name__ == "__main__":
 	SetSideHeightAndVelocity(Cell,U,v,Nx)
 	SetFluxDensity(Cell)
 	
-	for nt in range(1):
+	for nt in range(10):
 		UpdateU(Cell,dt)
-		#SetSideHeightAndVelocity(Cell,U,v,Nx)
-		#SetFluxDensity(Cell)
+		SetSideHeightAndVelocity(Cell,U,v,Nx)
+		SetFluxDensity(Cell)
 		
 		
 	
