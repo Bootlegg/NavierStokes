@@ -198,8 +198,19 @@ def PlotNormalVectors(Cell):
 		#plt.plot(Cell["{}".format(i)]["Normalvector4"][0],Cell["{}".format(i)]["Normalvector4"][1],color="black")
 
 def PlotHeights(Cell):
-	for index in Cell:
-		plt.scatter(Cell[index]["Node"][0],Cell[index]["U"],color="black")
+	"""
+	Let's take node x coordinate and height and put them into arrays
+	"""
+	Nx = len(Cell)
+	xcoords = np.zeros(Nx)
+	ycoords = np.zeros(Nx)
+	id = 0
+	for i in Cell:
+		#plt.scatter(Cell[i]["Node"][0],Cell[i]["U"],color="black")
+		xcoords[id] = Cell[i]["Node"][0]
+		ycoords[id] = Cell[i]["U"]
+		id += 1
+	plt.plot(xcoords,ycoords,color="black")
 	
 def MatchVolumes(Cell1,Cell2):
 	"""
@@ -253,7 +264,7 @@ def MatchVolumes(Cell1,Cell2):
 	#print(V)
 	Cell1["{}".format(Cell1length)]["V"] = V
 
-def SetNodeHeight(Cell,U,v,Nx):
+def SetNodeHeight(Cell,U,v,Nx,dx):
 	"""
 	Only for the node. later we will extrapolate to edges of the control volume sides/edges
 	
@@ -262,7 +273,7 @@ def SetNodeHeight(Cell,U,v,Nx):
 	"""
 	j = 0
 	for i in Cell:
-		j += 3
+		#j += 3
 		#if "i" == "0":
 			#periodic?
 		#	pass
@@ -270,8 +281,10 @@ def SetNodeHeight(Cell,U,v,Nx):
 			#periodic?
 		#	pass
 		
-		Cell[i]["U"] = U+np.cos(j*2)
+		#Cell[i]["U"] = U+np.cos(j*2)
+		Cell[i]["U"] = U + np.cos(10*j*dx/(2*np.pi)-20/(2*np.pi))
 		Cell[i]["Unew"] = 0
+		j += 1
 
 
 def SetSideHeightAndVelocity(Cell,U,v,Nx):
@@ -349,24 +362,133 @@ def SetSideHeightAndVelocity(Cell,U,v,Nx):
 	for i in Cell:
 		if int(i) < Nx-1:
 			Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
-	print("Printing side4 height")
+	# print("Printing side4 height")
 	#De printer alle fucking 0.... makes no sense dude...
 	#JEg sætter dem jo!!! side 4!!!!
 	
 	
 	
-	for i in Cell:
-		print(Cell[i]["Side4"][3])
-		print(Cell["{}".format(int(i))]["Side4"][3])
-		if int(i) < Nx-1:
-			print(Cell["{}".format(int(i)+1)]["Side4"][3])
+	# for i in Cell:
+		# print(Cell[i]["Side4"][3])
+		# print(Cell["{}".format(int(i))]["Side4"][3])
+		# if int(i) < Nx-1:
+			# print(Cell["{}".format(int(i)+1)]["Side4"][3])
 			
-	print("Cell 0 sides and heights")
-	print(Cell["0"]["Side2"][2])
-	print(Cell["0"]["Side2"][3])
-	print(Cell["0"]["Side4"][2])
-	print(Cell["0"]["Side4"][3])
+	# print("Cell 0 sides and heights")
+	# print(Cell["0"]["Side2"][2])
+	# print(Cell["0"]["Side2"][3])
+	# print(Cell["0"]["Side4"][2])
+	# print(Cell["0"]["Side4"][3])
+
+def SetSideHeightAndVelocityQuadratic(Cell,U,v,Nx):
+	"""
+	We take from node center and distribute it to the sides her.
+	Based on upstream etc.
+	Ahh, btw...
+	Jeg skal jo være sikker på 2 neighbor cells har samme enighed om hvad height og velocity er!
+	Så jeg skal måske add nogle neighbor list fx til hver cell...
+	
+	Det virker som om jeg kommer til at gøre dobbelt så mange calculation ift. hvad der er nødvendigt...
+	men, som første proof-of-concept er det måske godt nok det her, så kan jeg tænke
+	
+	over hvordan det skal forbedres næste gang
+	SÅ lærer jeg også måderne IKKE at gøre det på
+	
+	
+	MakeFluxDensity() skal jo kaldes EFTER denne her, så problem skal solves her i denne function
+	
+	Jeg skal se om jeg er nødt til at access neighbor cells...
+	Jeg kan jo faktisk bare sætte både Cell[i] og neighbor cell side height på samme tid
+	Det er 2 heights jeg kan sætte på samme tid, når jeg først har set hvilken side height skal have...
+	
+	
+	En Cell node vil give sin height til højre side af sin Cell.
+	Så, det er "Side2" som skal have U value fra Cell[i]
+	
+	
+	Lidt weirdness med at Nx = 20, men len(Cell) = 21, så der er lidt forvirring i disse if statements
+	"""
+	print("Setting SideHeight")
+	print("NX is {}".format(Nx))
+	print("Len of cell is {}".format(len(Cell)))
+	for i in Cell:
+		Cell[i]["Side1"][2] = 0 #we don't use side1 
+		Cell[i]["Side2"][2] = v
+		Cell[i]["Side3"][2] = 0 #we don't use side3
+		Cell[i]["Side4"][2] = v 
 		
+		if int(i) == int(0):
+			
+			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
+			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
+			#denne her skal have "U" fra Cell["Nx-1"]
+			Cell["0"]["Side4"][3] = Cell["{}".format(Nx-1)]["U"]
+			Cell["0"]["Side2"][3] = (1.0/8)*(
+												-Cell["{}".format(Nx-1)]["U"]
+												+6*Cell["0"]["U"]
+												+3*Cell["1"]["U"]
+												)
+		
+		elif int(i) == int(Nx-1):
+			
+			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
+			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
+			#denne her skal have "U" fra Cell["Nx-1"]
+			Cell[i]["Side4"][3] = Cell["0"]["Side2"][3]
+			Cell[i]["Side2"][3] = (1.0/8)*(
+												-Cell["{}".format(Nx-1)]["U"]
+												+6*Cell["{}".format(Nx-1)]["U"]
+												+3*Cell["0"]["U"]
+												)
+		
+		#elif int(i) == Nx-1:
+			
+		
+		else:
+			if v > 0:
+				print(i)
+				#Flow goes to the right, so either we up U into side2 or side4, not sure
+				Cell[i]["Side1"][3] = 0 #we don't use side1 
+				Cell[i]["Side2"][3] = (1.0/8)*(
+												-Cell["{}".format(int(i)-1)]["U"]
+												+6*Cell[i]["U"]
+												+3*Cell["{}".format(int(i)+1)]["U"]
+												)
+				Cell[i]["Side3"][3] = 0 #we don't use side3
+				Cell[i]["Side4"][3] = 0 #Cell[i]["U"]
+				
+				#if int(i) < Nx:
+					#print("True")
+					#Cell["{}".format(int(i)+1)]["Side1"][3] = 0#Cell[i]["Side2"][3]
+					#Cell["{}".format(int(i)+1)]["Side2"][3] = 0#Cell[i]["Side2"][3]
+					#Cell["{}".format(int(i)+1)]["Side3"][3] = 0#Cell[i]["Side2"][3]
+					#Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
+					
+					
+					#Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["U"]
+					
+					#print("{}".format(int(i)+1))
+					#print(Cell[i]["Side2"][3])
+					#print(Cell["{}".format(int(i)+1)]["Side4"][3])
+					#print(Cell["{}".format(int(i)+1)]["Side4"][3])
+					
+					#print(Cell[i]["Side2"][3])
+					#print(Cell["{}".format(int(i)+1)]["Side4"][3])
+				#Cell[i] and Cell[i+1] share side/edge/surface, so we duplicate results.
+				#if int(i) < Nx-1:
+	
+	#==============
+	#Måske først calculate "Side2", og her copy dem til opposite side...
+	#Men ikke sikkert at det er så simpelt at copy dem hen, når vi bruger quadratic interpolation...
+	#Eller det må det vel være? Ikke sikker :S
+	for i in Cell:
+		#if int(i) == int(0):
+		#	Cell["0"]["Side4"][3] = Cell["{}".format(Nx)]["U"]
+			
+		if int(i) < Nx-1:
+			Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
+
+
 def SetFluxDensity(Cell):
 	"""
 	The 4th index of "Side" refers to the flux density, 3 is height, 2 is velocity, so 2*3 -> height*velocity
@@ -419,36 +541,49 @@ def Updatev(Cell,dt):
 	Right now we just set v constant
 	"""
 	
+def UpdateTimeStep(Cell,dt):
+	
+	for i in Cell:
+		Cell[i]
+	return
+	
 if __name__ == "__main__":
 	
 	x0 = 0
-	x1 = 20
+	x1 = 4
 	y0 = 0
 	y1 = 10
 	x = np.linspace(x0,x1,11)
 	y = np.linspace(y0,y1,11)
-
+	
 	Cell = {}
 	Nx = 20
-	dx = 4/(Nx+1)
+	x1range = np.linspace(0,4,Nx)
+	dx = x1range[1]-x1range[0]
+	#dx = (x1-x0)/(Nx+1) #Tror faktisk det skal være Nx-1?
 	a = 0
 	b = 0
 	#Bør faktisk include x-range.... fordi det er line segments...
-	x1range = np.linspace(0,4,Nx+1)
+	
 	MakeCell(Cell,a,b,x1range,0,dx)
 	MakeSidesAndNormalVectors(Cell)
-
+	
+	print("Lenght of Cell is {}".format(len(Cell)))
 	
 	U = 3
 	v = 1
 	dt = dx/v
-	SetNodeHeight(Cell,U,v,Nx) #Initial height
+	SetNodeHeight(Cell,U,v,Nx,dx) #Initial height
+	#Initial
 	SetSideHeightAndVelocity(Cell,U,v,Nx)
 	SetFluxDensity(Cell)
 	
-	for nt in range(10):
+	
+	runtime = 3
+	for nt in range(runtime):
 		UpdateU(Cell,dt)
-		SetSideHeightAndVelocity(Cell,U,v,Nx)
+		#SetSideHeightAndVelocity(Cell,U,v,Nx)
+		SetSideHeightAndVelocityQuadratic(Cell,U,v,Nx)
 		SetFluxDensity(Cell)
 		
 		
@@ -461,7 +596,7 @@ if __name__ == "__main__":
 	PlotHeights(Cell)
 	plt.xlabel("x")
 	plt.ylabel("y")
-	plt.title("pseudo-1d grid")
+	plt.title("pseudo-1d grid nt = {}".format(runtime-1))
 	plt.show()
 	
 	#for index in Cell:
