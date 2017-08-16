@@ -390,6 +390,10 @@ def SetSideHeightAndVelocityLinear(Cell,U,v,Nx):
 	Linear interpolation
 	
 	Kan godt være jeg mangler at gøre den "symmetric":.. lige nu laver jeg kun linear interpolation på den ene side
+	Quadratic var også symmetric, right?
+	Skal være sikker på, at jeg i UpdateU, gør det ordentligt.
+	Tager fra begge sides.
+	
 	"""
 	print("Setting SideHeight")
 	print("NX is {}".format(Nx))
@@ -400,28 +404,27 @@ def SetSideHeightAndVelocityLinear(Cell,U,v,Nx):
 		Cell[i]["Side3"][2] = 0 #we don't use side3
 		Cell[i]["Side4"][2] = v 
 		
-		#if int(i) == int(0):
-			
+		if int(i) == int(0):
+			dx = Cell["1"]["Node"][0] - Cell["0"]["Node"][0]
 			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
 			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
 			#denne her skal have "U" fra Cell["Nx-1"]
-		#	Cell["0"]["Side4"][3] = Cell["{}".format(Nx-1)]["U"]
-		#	Cell["0"]["Side2"][3] = (1.0/8)*(
-		#										-Cell["{}".format(Nx-1)]["U"]
-		#										+6*Cell["0"]["U"]
-		#										+3*Cell["1"]["U"]
-		#										)
+			Cell["0"]["Side4"][3] = Cell["{}".format(Nx-1)]["U"] + dx/2*(Cell["0"]["U"]-Cell["{}".format(Nx-1)]["U"])/dx
+			Cell["0"]["Side2"][3] = Cell["0"]["U"] + dx/2*(Cell["1"]["U"]-Cell["0"]["U"])/dx
 		
-		if int(i) == int(Nx-1):
+		elif int(i) == int(Nx-1):
 			
 			#Side4 ved Cell 0 skal have value fra last cell, når vi har v > 0
 			#Cell["0"]["Side4"] = Cell["{}".format(Nx-1)]
 			#denne her skal have "U" fra Cell["Nx-1"]
 			dx = Cell["1"]["Node"][0] - Cell["0"]["Node"][0]
+			#print("dx = {}".format(dx))
 			#Hmmm... faktisk, så hvis man udregne dx mellem de her to, så ville dne jo give hele grid som distance!
 			#Så vi må lave en fake dx på en måde... vi bruger bare node "1" og node "0"
-			Cell[i]["Side4"][3] = Cell["0"]["Side2"][3]
-			Cell[i]["Side2"][3] = Cell[i]["Side2"][3] + dx/2 * (Cell["0"]["U"]-Cell[i]["U"])/dx
+			
+			Cell[i]["Side2"][3] = Cell[i]["U"] + dx/2*(Cell["0"]["U"]-Cell[i]["U"])/dx
+			
+			Cell[i]["Side4"][3] = Cell["{}".format(Nx-2)]["U"] + dx/2*(Cell[i]["U"]-Cell["{}".format(Nx-2)]["U"])/dx
 		
 		#elif int(i) == Nx-1:
 			
@@ -436,7 +439,7 @@ def SetSideHeightAndVelocityLinear(Cell,U,v,Nx):
 				Cell[i]["Side1"][3] = 0 #we don't use side1 
 				Cell[i]["Side2"][3] = Cell[i]["U"] + dx/2*(Cell["{}".format(int(i)+1)]["U"]-Cell[i]["U"])/dx
 				Cell[i]["Side3"][3] = 0 #we don't use side3
-				Cell[i]["Side4"][3] = 0 #Cell[i]["U"]
+				Cell[i]["Side4"][3] = Cell["{}".format(int(i)-1)]["U"] + dx/2*(Cell[i]["U"]-Cell["{}".format(int(i)-1)]["U"])/dx
 				
 
 	
@@ -444,12 +447,12 @@ def SetSideHeightAndVelocityLinear(Cell,U,v,Nx):
 	#Måske først calculate "Side2", og her copy dem til opposite side...
 	#Men ikke sikkert at det er så simpelt at copy dem hen, når vi bruger quadratic interpolation...
 	#Eller det må det vel være? Ikke sikker :S
-	for i in Cell:
+	#for i in Cell:
 		#if int(i) == int(0):
 		#	Cell["0"]["Side4"][3] = Cell["{}".format(Nx)]["U"]
 			
-		if int(i) < Nx-1:
-			Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
+		#if int(i) < Nx-1:
+		#	Cell["{}".format(int(i)+1)]["Side4"][3] = Cell[i]["Side2"][3]
 			
 	
 def SetSideHeightAndVelocityQuadratic(Cell,U,v,Nx):
