@@ -1,3 +1,25 @@
+"""
+
+Perhaps instead of setting psi = 0, see if it changes if it set psi = psi_old on northern and southern boundary
+for Poisson solver. and hold psi_old constant throughout pseudo-time iteration on nothern and southern boundaries
+
+
+lige nu holder jeg zeta = 0 på boundaries, dette er nok også forkert...
+i hvert fald gøre den periodic etc?
+
+
+måske er min velocity fra stream function psi derivatives også forkerte
+
+lige nu er beta constant, bør den vidst ikke være, right?
+
+
+#Mangler denne her ikke noget? Måske?Passer det her med units? Ikke særlig godt tror jeg?
+psi+=U0*(Ly/2*1000-y)
+jo det passer vel med units faktisk, men, hvorfor er den der?
+
+"""
+
+
 import numpy as np
 from pylab import *
 import matplotlib.pyplot as plt
@@ -44,7 +66,78 @@ def SolvePoisson(psi,zeta):
 		psi[-1,:] = 0
 		psi[0,:] = 0 
 		
-		
+def UpdateZeta(zetan,zeta,u,v,beta):
+
+	"""
+	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
+	Men lad os starte et sted dog
+	"""
+	zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-dt*(\
+		(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
+		+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
+		+beta*v[1:ny-1,1:nx-1])
+	
+	zetan[1:ny-1,0] = zeta[1:ny-1,0]-dt*(\
+		(u[1:ny-1,1]*zeta[1:ny-1,1]-u[1:ny-1,-1]*zeta[1:ny-1,-1])/(2*dx)\
+		+(v[2:ny,0]*zeta[2:ny,0]-v[0:ny-2,0]*zeta[0:ny-2,0])/(2*dy)\
+		+beta*v[1:ny-1,0])
+	
+	
+	zetan[1:ny-1,-1] = zeta[1:ny-1,-1]-dt*(\
+		(u[1:ny-1,0]*zeta[1:ny-1,0]-u[1:ny-1,-2]*zeta[1:ny-1,-2])/(2*dx)\
+		+(v[2:ny,-1]*zeta[2:ny,-1]-v[0:ny-2,-1]*zeta[0:ny-2,-1])/(2*dy)\
+		+beta*v[1:ny-1,-1])
+	
+	#zetan[1:ny-1,1] = zeta[1:ny-1,0]-dt*(\
+	#	(u[1:ny-1,1]*zeta[1:ny-1,1]-u[1:ny-1,-1]*zeta[1:ny-1,-1])/(2*dx)\
+	#	+(v[2:ny,0]*zeta[2:ny,0]-v[0:ny-2,0]*zeta[0:ny-2,0])/(2*dy)\
+	#	+beta*v[1:ny-1,0])
+	
+	#zeta = zetan		
+
+	
+def UpdateZetaLeapFrog(zetan,zetaold,zeta,u,v,beta):
+
+	"""
+	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
+	Men lad os starte et sted dog
+	
+	Hmm... jeg skal faktisk også have old velocities?:O
+	"""
+	zetan[1:ny-1,1:nx-1] = zetaold[1:ny-1,1:nx-1]-2*dt*(\
+		(u[1:ny-1,2:nx]*zetaold[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zetaold[1:ny-1,0:nx-2])/(2*dx)\
+		+(v[2:ny,1:nx-1]*zetaold[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zetaold[0:ny-2,1:nx-1])/(2*dy)\
+		+beta*v[1:ny-1,1:nx-1])
+	
+	#x borders
+	zetan[1:ny-1,0] = zetaold[1:ny-1,0]-2*dt*(\
+		(u[1:ny-1,1]*zetaold[1:ny-1,1]-u[1:ny-1,-1]*zetaold[1:ny-1,-1])/(2*dx)\
+		+(v[2:ny,0]*zetaold[2:ny,0]-v[0:ny-2,0]*zetaold[0:ny-2,0])/(2*dy)\
+		+beta*v[1:ny-1,0])
+	
+	
+	zetan[1:ny-1,-1] = zetaold[1:ny-1,-1]-2*dt*(\
+		(u[1:ny-1,0]*zetaold[1:ny-1,0]-u[1:ny-1,-2]*zetaold[1:ny-1,-2])/(2*dx)\
+		+(v[2:ny,-1]*zetaold[2:ny,-1]-v[0:ny-2,-1]*zetaold[0:ny-2,-1])/(2*dy)\
+		+beta*v[1:ny-1,-1])
+	
+	#y borders
+	zetan[0,1:nx-1] = zetaold[0,1:nx-1]-2*dt*(\
+		(u[0,2:nx]*zetaold[0,2:nx]-u[0,0:nx-2]*zetaold[0,0:nx-2])/(2*dx)\
+		+(v[1,1:nx-1]*zetaold[1,1:nx-1]-v[-1,1:nx-1]*zetaold[-1,1:nx-1])/(2*dy)\
+		+beta*v[0,1:nx-1])
+	
+	
+	zetan[-1,1:nx-1] = zetaold[-1,1:nx-1]-2*dt*(\
+		(u[-1,2:nx]*zetaold[-1,2:nx]-u[-1,0:nx-2]*zetaold[-1,0:nx-2])/(2*dx)\
+		+(v[0,1:nx-1]*zetaold[0,1:nx-1]-v[-2,1:nx-1]*zetaold[-2,1:nx-1])/(2*dy)\
+		+beta*v[-1,1:nx-1])
+	
+	
+	zetaold = zetan		
+	
+
+
 
 Lx = 6000
 Ly = 6000
@@ -64,7 +157,8 @@ Av4 = 10**(-6)
 A = 10**(-4)
 #initial vorticity and streamfunction
 
-zeta = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=float64)
+zetaold = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=float64)
+zeta = zetaold
 zetan = zeta
 #time integration parameters					#hours
 time_end = 3*3600 				#second
@@ -117,13 +211,15 @@ u = -dypsi
 v = dxpsi
 
 
-#Forward time difference
-zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-dt*(\
-	(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
-	+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
-	+beta*v[1:ny-1,1:nx-1])
-zeta = zetan
 
+
+#Forward time difference
+UpdateZeta(zetaold,zeta,u,v,beta)
+# zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-dt*(\
+	# (u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
+	# +(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
+	# +beta*v[1:ny-1,1:nx-1])
+# zeta = zetan
 
 
 
@@ -141,13 +237,15 @@ ax.set_ylabel('y')
 
 def animate(i):
 
-	global zetan,u,v,zeta,psi,psin,dxpsi,dypsi
+	global zetan,u,v,zeta,psi,psin,dxpsi,dypsi,zetaold
 	#leapfrog
-	zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-2*dt*(\
-		(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
-		+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
-		+beta*v[1:ny-1,1:nx-1])
-	zeta = zetan
+	#zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-2*dt*(\
+	#	(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
+	#	+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
+	#	+beta*v[1:ny-1,1:nx-1])
+	#zeta = zetan
+	
+	UpdateZetaLeapFrog(zetan,zetaold,zeta,u,v,beta)
 	
 	SolvePoisson(psi,zeta)
 	# #Calculate psi streamfunction
@@ -167,6 +265,8 @@ def animate(i):
 		# psi[-1,:] = 0
 		# psi[0,:] = 0 
 
+		
+	#Mangler denne her ikke noget? Måske?Passer det her med units? Ikke særlig godt tror jeg?
 	psi+=U0*(Ly/2*1000-y)
  	
 	#Calculate gradients for air velocity
@@ -182,7 +282,8 @@ def animate(i):
 
 	u = -dypsi
 	v = dxpsi
-
+	
+	zeta = zetan
 	ax.clear()
 	ax.contour(x,y,zeta,colors='black')
 	ax.quiver(x,y,u,v)
