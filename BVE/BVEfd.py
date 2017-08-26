@@ -17,6 +17,9 @@ lige nu er beta constant, bør den vidst ikke være, right?
 psi+=U0*(Ly/2*1000-y)
 jo det passer vel med units faktisk, men, hvorfor er den der?
 
+
+I may have translated matlab code wrong, forgot python numpy slicing doesn't include last point, so x[1:nx-1] e.g
+
 """
 
 
@@ -38,6 +41,14 @@ def SolvePoisson(psi,zeta):
 	We set BCs at y = top and y = bottom, but not x, i think
 	Following lec12.pdf here
 	
+	
+	
+	right now i'm doing psi[1:ny-1,1:nx-1]
+	#So that means i'm not setting psi[bottom,x] but I AM setting psi[top,x]
+	#So i think it should be psi[1:ny-2,1:nx-1]
+	#Or maybe, x should also be changed...
+	But, remember in Python, 1:ny-1, then 1 is included, but ny-1 is excluded, so in effect, we're doing 1:ny-2
+	
 	psi is streamfunction
 	zeta is vorticity
 	"""
@@ -48,22 +59,32 @@ def SolvePoisson(psi,zeta):
 	psin = np.zeros((ny,nx),dtype=float64)
 	psin = psi.copy()
 	
-	#Skal måske lave en special case for enten x = 0 eller x = L, hvor jeg copy over?
 	
 	dtau = 0.5*0.5*(0.5*dx**2+0.5*dy**2)
 	for r in range(500): #pseudo-time
 		psin = psi.copy()
+		
+		
+		#Interior points
 		psi[1:ny-1,1:nx-1] = psin[1:ny-1,1:nx-1]+dtau*(
 				+(psin[1:ny-1,2:nx]-2*psin[1:ny-1,1:nx-1]+psin[1:ny-1,0:nx-2])/dx**2
 				+(psin[2:ny,1:nx-1]-2*psin[1:ny-1,1:nx-1]+psin[0:ny-2,1:nx-1])/dy**2
 				-zeta[1:ny-1,1:nx-1])
-
+		
+		
+		#x = 0 boundary
+		#Jeg tror, vi skal tage et note ud af Holtons bog, og her, skipper vi psin[1:ny-1,-1] og bruger psin[1:ny-1,-2]
 		psi[1:ny-1,0] = psin[1:ny-1,0]+dtau*(
-				+(psin[1:ny-1,1]-2*psin[1:ny-1,0]+psin[1:ny-1,-1])/dx**2
+				+(psin[1:ny-1,1]-2*psin[1:ny-1,0]+psin[1:ny-1,-2])/dx**2
 				+(psin[2:ny,0]-2*psin[1:ny-1,0]+psin[0:ny-2,0])/dy**2
 				-zeta[1:ny-1,0])
+		#Old
+		#psi[1:ny-1,0] = psin[1:ny-1,0]+dtau*(
+		#		+(psin[1:ny-1,1]-2*psin[1:ny-1,0]+psin[1:ny-1,-1])/dx**2
+		#		+(psin[2:ny,0]-2*psin[1:ny-1,0]+psin[0:ny-2,0])/dy**2
+		#		-zeta[1:ny-1,0])		
 		
-		
+		#x = L boundary
 		#Enten så gør den periodic sådan her
 		#psi[1:ny-1,-1] = psi[1:ny-1,0]
 		#eller sådan her, Holton
@@ -92,23 +113,29 @@ def FirstStepZeta(zeta,zetan,u,v,beta):
 	"""
 	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
 	Men lad os starte et sted dog
+	
+	When we calculate zetan for x = 0, we use x -> -2 instead of x -> -1
 	"""
+	
+	#Interior points
 	zetan[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1]-dt*(\
 		(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
 		+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
 		+beta*v[1:ny-1,1:nx-1])
 	
-	#x = 0, x = L borders
+	#x = 0
 	zetan[1:ny-1,0] = zeta[1:ny-1,0]-dt*(\
-		(u[1:ny-1,1]*zeta[1:ny-1,1]-u[1:ny-1,-1]*zeta[1:ny-1,-1])/(2*dx)\
+		(u[1:ny-1,1]*zeta[1:ny-1,1]-u[1:ny-1,-2]*zeta[1:ny-1,-2])/(2*dx)\
 		+(v[2:ny,0]*zeta[2:ny,0]-v[0:ny-2,0]*zeta[0:ny-2,0])/(2*dy)\
 		+beta*v[1:ny-1,0])
 	
+	#x = L borders
+	#zetan[1:ny-1,-1] = zeta[1:ny-1,-1]-dt*(\
+	#	(u[1:ny-1,0]*zeta[1:ny-1,0]-u[1:ny-1,-2]*zeta[1:ny-1,-2])/(2*dx)\
+	#	+(v[2:ny,-1]*zeta[2:ny,-1]-v[0:ny-2,-1]*zeta[0:ny-2,-1])/(2*dy)\
+	#	+beta*v[1:ny-1,-1])
 	
-	zetan[1:ny-1,-1] = zeta[1:ny-1,-1]-dt*(\
-		(u[1:ny-1,0]*zeta[1:ny-1,0]-u[1:ny-1,-2]*zeta[1:ny-1,-2])/(2*dx)\
-		+(v[2:ny,-1]*zeta[2:ny,-1]-v[0:ny-2,-1]*zeta[0:ny-2,-1])/(2*dy)\
-		+beta*v[1:ny-1,-1])
+	zetan[:,-1] = zetan[:,0]
 	
 	#zetan[1:ny-1,1] = zeta[1:ny-1,0]-dt*(\
 	#	(u[1:ny-1,1]*zeta[1:ny-1,1]-u[1:ny-1,-1]*zeta[1:ny-1,-1])/(2*dx)\
@@ -170,9 +197,13 @@ def UpdateZetaLeapFrogHolton(zetan,zeta0,zeta,u,v,beta,numdif):
 
 	"""
 	
-	zetan[1:ny-2,0:nx-2] = (zeta0[1:ny-2,0:nx-2] -beta*2*dt*v[1:ny-2,0:nx-2]	
-							-2*dt*(dflx[1:ny-2,0:nx-2]+dfly[1:ny-2,0:nx-2])
-            -2*dt*numdif[1:ny-2,0:nx-2])
+	#zetan[1:ny-2,0:nx-2] = (zeta0[1:ny-2,0:nx-2] -beta*2*dt*v[1:ny-2,0:nx-2]	
+	#						-2*dt*(dflx[1:ny-2,0:nx-2]+dfly[1:ny-2,0:nx-2])
+     #       -2*dt*numdif[1:ny-2,0:nx-2])
+			
+	zetan[1:ny-1,0:nx-1] = (zeta0[1:ny-1,0:nx-1] -beta*2*dt*v[1:ny-1,0:nx-1]	
+							-2*dt*(dflx[1:ny-1,0:nx-1]+dfly[1:ny-1,0:nx-1])
+            -2*dt*numdif[1:ny-1,0:nx-1])
 	
 	zetan[:,nx-1]=zetan[:,0]
 
@@ -181,10 +212,29 @@ def divflux(P,u,v,dx,dy):
 	dfly = np.zeros((ny,nx))
 	#FØRST dfly
 	#han har sat 0 foran y divflux, så vi har ingen y directioon divflux langs I bottom og top
+	#dfly[0,:] = 0*(P[1,:]*v[1,:] - P[0,:]*v[0,:])/dy;
+	#dfly[ny-1,:] = 0*(P[ny-1,:]*v[ny-1,:] - P[ny-2,:]*v[ny-2,:])/dy;
+	#I center:
+	#dfly[1:ny-2,:] = (P[2:ny-1,:]*v[2:ny-1,:]-P[0:ny-3,:]*v[0:ny-3,:])/(2*dy);
+
+	#NU TAGER VI dflx
+	#% Take cyclic differences on left and right boundaries
+
+	#dflx[:,0]=(P[:,1]*u[:,1]-P[:,nx-2]*u[:,nx-2])/(2*dx);
+	#dflx[:,nx-1]= dflx[:,0];
+
+	#% take centered differences on interior points
+
+	#dflx[:,1:nx-2]= (P[:,2:nx-1]*u[:,2:nx-1]-P[:,0:nx-3]*u[:,0:nx-3])/(2*dx);
+	
+	
+	
+	#FØRST dfly
+	#han har sat 0 foran y divflux, så vi har ingen y directioon divflux langs I bottom og top
 	dfly[0,:] = 0*(P[1,:]*v[1,:] - P[0,:]*v[0,:])/dy;
 	dfly[ny-1,:] = 0*(P[ny-1,:]*v[ny-1,:] - P[ny-2,:]*v[ny-2,:])/dy;
 	#I center:
-	dfly[1:ny-2,:] = (P[2:ny-1,:]*v[2:ny-1,:]-P[0:ny-3,:]*v[0:ny-3,:])/(2*dy);
+	dfly[1:ny-1,:] = (P[2:ny,:]*v[2:ny,:]-P[0:ny-2,:]*v[0:ny-2,:])/(2*dy);
 
 	#NU TAGER VI dflx
 	#% Take cyclic differences on left and right boundaries
@@ -194,7 +244,7 @@ def divflux(P,u,v,dx,dy):
 
 	#% take centered differences on interior points
 
-	dflx[:,1:nx-2]= (P[:,2:nx-1]*u[:,2:nx-1]-P[:,0:nx-3]*u[:,0:nx-3])/(2*dx);
+	dflx[:,1:nx-1]= (P[:,2:nx]*u[:,2:nx]-P[:,0:nx-2]*u[:,0:nx-2])/(2*dx);
 	
 	return dflx,dfly
 
@@ -228,24 +278,61 @@ def Damping4(Dk4,nx,ny,U):
 def CalcVelocity(u,v,dxpsi,dypsi,psi,dx,dy):
 	"""
 	More closely following Holton, he does something different on last x coordinate, dxpsi[:,-1]
+	Also note, that we do
+	dxpsi[:,0]=(psi[:,1]-psi[:,-2])/(2*dx)
+	and NOT
+	dxpsi[:,0]=(psi[:,1]-psi[:,-1])/(2*dx)
+	so, in the last psi, we jump to SECOND LAST coordinate, instead of last coordinate.
+	so we skip the last column x = L, when calculating for x = 0
+	
 	"""
 	#Calculate gradients for air velocity
 	#forward on bottom? Backward on top?
 
+	#dypsi[0,:] = (psi[1,:] - psi[0,:])/dy
+	#dypsi[-1,:] = (psi[-1,:] - psi[-2,:])/dy
+	#dypsi[1:-2,:] = (psi[2:-1,:]-psi[0:-3,:])/(2*dy)  #Centered difference
+
+	
+	#x = 0, x = L
+#	dxpsi[:,0]=(psi[:,1]-psi[:,-2])/(2*dx)
+	#dxpsi[:,-1]= dxpsi[:,0]#(psi[:,0]-psi[:,-2])/(2*dx)
+	#
+	#Interior
+	#dxpsi[:,1:-2]= (psi[:,2:-1]-psi[:,0:-3])/(2*dx)  #centered difference
+
+	
 	dypsi[0,:] = (psi[1,:] - psi[0,:])/dy
 	dypsi[-1,:] = (psi[-1,:] - psi[-2,:])/dy
-	dypsi[1:-2,:] = (psi[2:-1,:]-psi[0:-3,:])/(2*dy)  #Centered difference
+	dypsi[1:-1,:] = (psi[2:,:]-psi[0:-2,:])/(2*dy)  #Centered difference
 
-
-	dxpsi[:,0]=(psi[:,1]-psi[:,-1])/(2*dx)
+	
+	#x = 0, x = L
+	dxpsi[:,0]=(psi[:,1]-psi[:,-2])/(2*dx)
 	dxpsi[:,-1]= dxpsi[:,0]#(psi[:,0]-psi[:,-2])/(2*dx)
-	dxpsi[:,1:-2]= (psi[:,2:-1]-psi[:,0:-3])/(2*dx)  #centered difference
+	
+	#Interior
+	dxpsi[:,1:-1]= (psi[:,2:]-psi[:,0:-2])/(2*dx)  #centered difference
 
 	u = -dypsi
 	v = dxpsi
 	
 	return u,v
 
+def KineticEnergy(u,v):
+	
+	KE = np.sum(u**2+v**2)
+	
+	
+	return KE
+	
+	
+	
+def Enstrophy(zeta):
+
+	Ens = np.sum(zeta*zeta)
+	return Ens
+	
 Lx = 6000 #km
 Ly = 6000 #km
 nx = 65
@@ -408,6 +495,11 @@ def animate(i):
 	u,v = CalcVelocity(u,v,dxpsi,dypsi,psi,dx,dy)
 	
 	dflx,dfly = divflux(zeta,u,v,dx,dy)
+	
+	KE = KineticEnergy(u,v)
+	Ens = Enstrophy(zeta)
+	print("KE = {}".format(KE))
+	print("En = {}".format(Ens))
 
 	ax.clear() #Hvorfor skal jeg bruge denne her? Den bruger de andre animations ikke
 	C = ax.contour(x/1000,y/1000,zeta*10**7,8,colors='black')
@@ -424,7 +516,7 @@ def animate(i):
 	#plt.xticks([-Lx/6,Lx/6])
 	#ax.set_xticks([0],('hey'))
 	plt.clabel(C,inline=1,fontsize=10,fmt="%1.1f")
-	print(zeta)
+	#print(zeta)
 
 	if i == 4:
 		fig.savefig('BVE.png', bbox_inches='tight')
