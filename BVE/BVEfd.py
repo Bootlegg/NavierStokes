@@ -1,5 +1,5 @@
 """
-
+Dan Krog
 Perhaps instead of setting psi = 0, see if it changes if it set psi = psi_old on northern and southern boundary
 for Poisson solver. and hold psi_old constant throughout pseudo-time iteration on nothern and southern boundaries
 
@@ -109,7 +109,6 @@ def SolvePoisson(psi,zeta):
 	
 		
 def FirstStepZeta(zeta,zetan,u,v,beta):
-
 	"""
 	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
 	Men lad os starte et sted dog
