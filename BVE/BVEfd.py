@@ -1,5 +1,5 @@
 """
-
+Dan Krog
 Perhaps instead of setting psi = 0, see if it changes if it set psi = psi_old on northern and southern boundary
 for Poisson solver. and hold psi_old constant throughout pseudo-time iteration on nothern and southern boundaries
 
