@@ -3,6 +3,37 @@ Dan Krog
 
 Numerical Solution of Barotropic Vorticity Equation
 
+vorticity, Holton page 101,
+Absolute vorticity eta,
+
+eta = zeta + f
+
+f is coriolis parameter, zeta is relative vorticity, zeta = nabla x (u,v)'
+
+dzeta/dt + J(psi,zeta+f) = 0
+
+where J is Jacobian operator
+
+
+Barotropic fluid, pressure depends only only density.
+Hence, we can take the shallow water equations, and make the height constant, h and z are constant,
+then, vertical velocity w = 0, and the fluid is horizontally nondivergent,
+du/dx + dv/dy = 0
+
+
+Boundary conditions, for a periodic in x, wall in ybottom and ytop
+psi = 0
+nablapsi.n = 0 (no-slip on side walls)
+
+
+DIfferent methods to solve the Poisson equation
+Should add some terms to the BVE, like vorticity drag, forcing, viscosity
+
+
+
+====================================================
+
+Change functions to return
 
 
 Perhaps instead of setting psi = 0, see if it changes if it set psi = psi_old on northern and southern boundary
@@ -25,6 +56,10 @@ jo det passer vel med units faktisk, men, hvorfor er den der?
 
 
 I may have translated matlab code wrong, forgot python numpy slicing doesn't include last point, so x[1:nx-1] e.g
+
+
+Add in Arawakian grid?
+
 
 """
 
@@ -49,12 +84,19 @@ def SolvePoisson(psi,zeta):
 	
 	nabla^2psi = zeta
 	
-	where psi is the streamfunction, and zeta is the relative vorticity
+	where we are solving for psi the streamfunction, and zeta is the relative vorticity
 	
 	
 	We set BCs at y = top and y = bottom, but not x, i think
 	Following lec12.pdf here
 	
+	
+	From lec12.pdf,
+	Solving poisson equation means putting some boundary condition on psi, right?
+	Because otherwise you could add any constant to psi, and it would still be able to give some curvature
+	nabla^2psi = f...
+	so it makes sense, to give some unique solution, we impose boundary conditions, 
+	but i think, for the sake of calculating velocity, it also wouldn't matter if we added some constant to psi
 	
 	
 	right now i'm doing psi[1:ny-1,1:nx-1]
@@ -124,6 +166,8 @@ def SolvePoisson(psi,zeta):
 		
 def FirstStepZeta(zeta,zetan,u,v,beta):
 	"""
+	Euler-forward probably?
+	
 	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
 	Men lad os starte et sted dog
 	
@@ -340,7 +384,13 @@ def CalcVelocity(u,v,dxpsi,dypsi,psi,dx,dy):
 	return u,v
 
 def KineticEnergy(u,v):
+	"""
+	Calculate Domain integrated Kinetic Energy
 	
+	Should be conserved.
+	Can also be done as |nablapsi|^2
+	
+	"""
 	KE = np.sum(u**2+v**2)
 	
 	
@@ -350,7 +400,11 @@ def KineticEnergy(u,v):
 	
 def Enstrophy(zeta):
 	"""
-	Calculate Enstrophy
+	Calculate Domain integrated Enstrophy
+	
+	Domain Integrated Enstrophy should be conserved.
+	calculated as,
+	|zeta+f|^2
 	"""
 	Ens = np.sum(zeta*zeta)
 	return Ens
@@ -551,12 +605,90 @@ if __name__ == "__main__":
 	#ax.set_yticks([Ly/3,2*Ly/3],[1,1])
 
 	
+	
+	
+	#From animation function,
+	for timestep in range(100):
+		t+=dt
+		zeta0 = zeta.copy()
+		zeta = zetan.copy()
+		
+		numdif = Damping4(Av4,nx,ny,zeta0)
+		
+		#UpdateZetaLeapFrog(zetan,zeta0,zeta,u,v,beta)
+		UpdateZetaLeapFrogHolton(zetan,zeta0,zeta,u,v,beta,numdif)
+		zeta0 = zeta.copy()
+		zeta = zetan.copy()
+		
+		
+		SolvePoisson(psi,zeta)
+		# #Calculate psi streamfunction
+		# #solve psi from lec12.pdf
+		# psin = np.zeros((ny,nx),dtype=float64)
+		# psin = psi.copy()
+		# dtau = 0.5*0.5*(0.5*dx**2+0.5*dy**2)
+		# for r in range(500): #pseudo-time
+			# psin = psi.copy()
+			# psi[1:ny-1,1:nx-1] = psin[1:ny-1,1:nx-1]+dtau*(\
+					# (psin[1:ny-1,2:nx]-2*psin[1:ny-1,1:nx-1]+psin[1:ny-1,0:nx-2])/dx**2\
+					# +(psin[2:ny,1:nx-1]-2*psin[1:ny-1,1:nx-1]+psin[0:ny-2,1:nx-1])/dy**2\
+					# +zeta[1:ny-1,1:nx-1])
 
-	anim = animation.FuncAnimation(
-	fig, 
-	animate, 
-	#frames=5, 
-	interval=0.5,
-	blit=False #blit=False default, 
-	)
-	plt.show()
+			# #psi[:,-1] = 0 #right boundary
+			# #psi[:,0] = 0	#left boundary
+			# psi[-1,:] = 0
+			# psi[0,:] = 0 
+
+		
+		psi+=U0*(Ly/2*1000-y)
+		
+		# #Calculate gradients for air velocity
+		# #forward on bottom? Backward on top?
+		#dypsi[0,:] = (psi[1,:] - psi[0,:])/dy
+		#dypsi[-1,:] = (psi[-1,:] - psi[-2,:])/dy
+		#dypsi[1:-2,:] = (psi[2:-1,:]-psi[0:-3,:])/(2*dy)  #Centered difference
+
+
+		#dxpsi[:,0]=(psi[:,1]-psi[:,-1])/(2*dx)
+		#dxpsi[:,-1]= dxpsi[:,0]#(psi[:,0]-psi[:,-2])/(2*dx)
+		#dxpsi[:,1:-2]= (psi[:,2:-1]-psi[:,0:-3])/(2*dx)  #centered difference
+
+		#u = -dypsi
+		#v = dxpsi
+		
+		u,v = CalcVelocity(u,v,dxpsi,dypsi,psi,dx,dy)
+		
+		dflx,dfly = divflux(zeta,u,v,dx,dy)
+		
+		KE = KineticEnergy(u,v)
+		Ens = Enstrophy(zeta)
+		print("KE = {}".format(KE))
+		print("En = {}".format(Ens))
+
+		ax.clear() #Hvorfor skal jeg bruge denne her? Den bruger de andre animations ikke
+		C = ax.contour(x/1000,y/1000,zeta*10**7,8,colors='black')
+		#C = ax.contour(x/1000,y/1000,psi/100000,8,colors='black')
+		ax.quiver(x/1000,y/1000,u,v)
+		ax.set_title('Barotropic Vorticity Equation t = {}'.format(t))
+		#ax.set_xlabel('x')
+		#ax.set_ylabel('y')
+		ax.set_xticks([-Lx*2/6,-Lx/6,0,Lx/6,Lx*2/6])
+		ax.set_yticks([-Ly*2/6,-Ly/6,0,Ly/6,Ly*2/6])
+		ax.set_xlabel("x/km")
+		ax.set_ylabel("y/km")
+		#plt.xticks([-Lx/6,Lx/6],[-Lx/6,Lx/6])
+		#plt.xticks([-Lx/6,Lx/6])
+		#ax.set_xticks([0],('hey'))
+		plt.clabel(C,inline=1,fontsize=10,fmt="%1.1f")
+		#print(zeta)
+
+	#===========================
+	#USe animation function
+	# anim = animation.FuncAnimation(
+	# fig, 
+	# animate, 
+	# #frames=5, 
+	# interval=0.5,
+	# blit=False #blit=False default, 
+	# )
+	# plt.show()
