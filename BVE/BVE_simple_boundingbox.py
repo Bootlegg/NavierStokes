@@ -125,6 +125,11 @@ BCs:
 For bounding box, we need to set psi = 0 on ALL sides
 Probably also some conditions on zeta??
 
+barotropic_model.m and grad.m from Holton scripts!
+in grad.m, they ALSO use forward differences, for velocity, i.e differentiation psi...
+so Holton, uses Full-Slip boundary conditions on north and south!
+and it's implemented, with forward differences for u = -dpsi/dy
+
 
 https://www.mi.uni-hamburg.de/arbeitsgruppen/theoretische-meteorologie/personen/lunkeit-frank/numerik/dokumente/barotrop.pdf
 #no flow across boundary, on south and northern, means v = 0
@@ -552,10 +557,10 @@ def PsiSolvePoissonJacobi(psi,zeta,dx,dy,nx,ny,epstol,Ngc):
 		
 		
 		#Psi no-flow across boundary ACTUAL BOUNDARY
-		psi[:,-1+Ngc] = 0 #right boundary
-		psi[:,0+Ngc] = 0	#left boundary
-		psi[0+Ngc,:] = 0  #south boundary
-		psi[-1-Ngc,:] = 0 #north boundary
+		#psi[:,-1+Ngc] = 0 #right boundary
+		#psi[:,0+Ngc] = 0	#left boundary
+		#psi[0+Ngc,:] = 0  #south boundary
+		#psi[-1-Ngc,:] = 0 #north boundary
 		
 		#
 		
@@ -766,6 +771,36 @@ def RobertAsselinFilter():
 
 
 
+def NoSlipBCvorticity(zeta,psi,dx,dy):
+
+	#No-slip zeta BC
+	#GHOST CELLS OR BOUNDARY???
+	#zeta = -du/dy
+	#dv/dx = 0, because v = 0, due to no-flow across boundary
+	#south, along the entire edge
+	zeta[0,:] = (2/dy**2)*(psi[1,:]-psi[0,:])
+	#zeta[0,:] = -(u[1,:]-u[0,:])/dy #south
+	#north, along the entire edge
+	zeta[-1,:] = (2/dy**2)*(psi[-1,:]-psi[-2,:])
+	#zeta[-1,:] = -(u[-1,:]-u[-2,:])/dy #north
+	
+	
+	#zeta = dv/dx
+	#-du/dy = 0, because u = 0, due to no-flow across boundary
+	#west, along entire egde
+	zeta[:,0] = (2/dx**2)*(psi[:,1]-psi[:,0]) #west
+	#zeta[:,0] = (v[:,1]-v[:,0])/dx #west
+	#east along entire edge
+	zeta[:,-1] = (2/dx**2)*(psi[:,-1]-psi[:,-2]) #east
+	#zeta[:,-1] = (v[:,-1]-v[:,-2])/dx #east
+	
+	return zeta
+	
+	
+	
+
+
+
 def CalcVelocity(psi,dx,dy):
 	"""
 	Should probably also take u,v as input, or initiate u,v here...
@@ -784,8 +819,8 @@ def CalcVelocity(psi,dx,dy):
 	#psi[y,x] array order
 	for i in range(1,nx-1):
 		for j in range(1,ny-1):
-			u[i,j] = -(psi[i+1,j]-psi[i-1,j])/(2*dy)
-			v[i,j] = (psi[i,j+1]-psi[i,j-1])/(2*dx)
+			u[j,i] = -(psi[j+1,i]-psi[j-1,i])/(2*dy)
+			v[j,i] = (psi[j,i+1]-psi[j,i-1])/(2*dx)
 			
 			
 	return u,v
@@ -834,14 +869,8 @@ if __name__ == "__main__":
 	
 	
 	#Poisson solver error
-	epstol = 1e-7
+	epstol = 1e-8
 
-
-	#We have 3 sets of zetas here, one is initial, I would assume? zeta0
-	#zeto0 is set to a gaussian it
-	zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
-	zeta = zeta0.copy()
-	zetan = zeta0.copy()
 
 
 
@@ -858,9 +887,129 @@ if __name__ == "__main__":
 	#dfly = np.zeros((ny,nx),dtype=np.float64)
 	#dflx = np.zeros((ny,nx),dtype=np.float64)
 
+
+
+
+
+	#Initial conditions from psi Rossby-haurwitz
+	#Rossby wave-packets
+	#psi[:,:] = np.cos(k1*x-w*t)*sin(k2*y)
+	#psi[:,:] = np.cos(k*x)*np.sin(m*y)
+	#http://www.math.ualberta.ca/ijnam/Volume-10-2013/No-3-13/2013-03-04.pdf
+	#Rossby wave packet satisfies Dirichlet Boundary condition, but those are specific...
+	#So I think I need simpler IC...
+	
+	#https://dspace.library.uvic.ca/bitstream/handle/1828/1218/Final%20THESIS.pdf?sequence=1
+	#Barotropic Rossby Waves psi(x,y) is prop to RE(exp(i(kx+ly-wt)))
+	#1)Barotropic Rossby Waves psi(x,y) = A*RE(exp(i(kx+ly-wt)))
+	#2)Planetary Wave Packets psi(x,y) = a*cos(k1x-wt)*sin(k2y)
+	#2) solve equatorial BVE exactly
+	
+	#Okay, I want, psi = 0 on all edges, so cos() and sin() must be 0 on edges...
+	#Now, sin(0) = 0, and cos(0)=1, so they are opposite in their usage, and thus k1,k2 should be different prolly
+	#Should probably plot initial conditions... of psi...
+	
+	#2) has v = 0, on walls Y = +-
+	#IF, k2 = m1*pi/Y, where m1 is some multiple
+	
+	#I should just do sin(k1*x)*sin(k2*x), tbh
+	#
+	k1 = 2*pi/(Lx*1000)
+	k2 = 2*pi/(Ly*1000)
+	psi[:,:] = np.sin(k1*x)*np.sin(k2*y)
+	
+	#Hmm, not quite 0 at the borders, so maybe i enforce it? Maybe numerical precision??
+	psi[0,:] = 0
+	psi[-1,:] = 0
+	psi[:,0] = 0
+	psi[:,-1] = 0
+
+	
+	#start with psi0
+	#then
+	#u0 = -dpsi0/dy
+	#v0 = dpsi0/dx
+	u,v = CalcVelocity(psi,dx,dy)
+	
+	
+	#Rescale initial speed
+	
+	
+	#f[y,x], boundary conditions for velocity
+	#no-flow across boundary
+	u[:,0] = 0 #western border
+	u[:,-1] = 0 #eastern border
+	v[0,:] = 0 #southern border
+	v[-1,:] = 0 #northern border
+	#then
+	#zeta0 = du0/dy - dv0/dx
+	#actually pretty straight forward, also equilevant to nabla^2psi0 = zeta0 the forward poisson problem...
+	#
+	#and then you can also rescale the velocity, to give e.g 5m/s
+	
+	
+	#Full-Slip Forward differences on N,S,E,W BC, like Holton grad.m and some other papers...
+	#Try for simplicity...
+	u[0,:] = -(psi[1,:] - psi[0,:])/dy #south
+	u[-1,:] = -(psi[-1,:] - psi[-2,:])/dy #north
+	v[:,0] = (psi[:,1] - psi[:,0])/dx #east
+	v[:,-1] = (psi[:,-1] - psi[:,-2])/dx #west
+
+	
+	
+	#We have 3 sets of zetas here, one is initial, I would assume? zeta0
+	#zeto0 is set to a gaussian it
+	#zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
+	zeta0 = np.zeros((ny,nx),dtype=np.float64)
+	zeta = zeta0.copy()
+	zetan = zeta0.copy()
+	
+	for i in range(1,nx-1):
+		for j in range(1,ny-1):
+			#u[i,j] = -(psi[i+1,j]-psi[i-1,j])/(2*dy)
+			#v[i,j] = (psi[i,j+1]-psi[i,j-1])/(2*dx)
+			zeta0[j,i] = (v[j,i+1]-v[j,i-1])/(2*dx)-(u[j+1,i]-u[j-1,i])/(2*dy)
+			
+	#Now, i'm supposed to have zeta = 0 on BCs, i think, for FULL SLIP...
+	#But, maybe the rossby wave packet defined, is NOT good with zeta = 0 on BCs,
+	#maybe those initial conditions do not satisfy the BCs...
+	
+	
+	#We have 3 sets of zetas here, one is initial, I would assume? zeta0
+	#zeto0 is set to a gaussian it
+	#zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
+	zeta = zeta0.copy()
+	zetan = zeta0.copy()
+
+
+	
+	
+	print("INITIAL BOUNDARY CONDITIONS")
+	print("u[0,:5]", u[0,:5])
+	print("u[-1,:5]", u[-1,:5])
+	print("u[:5,0]", u[:5,0])
+	print("u[:5,-1]", u[:5,-1])
+	print("v[0,:5]", v[0,:5])
+	print("v[-1,:5]", v[-1,:5])
+	print("v[:5,0]", v[:5,0])
+	print("v[:5,-1]", v[:5,-1])
+	print("psi[0,:5]", psi[0,:5])
+	print("psi[-1,:5]", psi[-1,:5])
+	print("psi[:5,0]", psi[:5,0])
+	print("psi[:5,-1]", psi[:5,-1])
+	
+	
+	print("ARRAY TEST")
+	Anytest = np.array([1,2,3,4,5,6,7,8,9])
+	print(Anytest[-1],Anytest[-2])
+
+	
 	
 	#Ghost cells
 	Ngc = 0
+	
+	#Boundary conditions from beginning
+	#zeta = NoSlipBCvorticity(zeta,psi,dx,dy)
 	
 
 	while t < time_end:
@@ -873,8 +1022,12 @@ if __name__ == "__main__":
 		psi = PsiSolvePoissonJacobi(psi,zeta,dx,dy,nx,ny,epstol,Ngc)
 		
 		#psi = psi + U0*(Ly/2*1000 -y)
-
-
+		#No-slip?
+		#psi[:,-1-1] = 0 #right boundary
+		#psi[:,0+1] = 0	#left boundary
+		#psi[0+1,:] = 0  #south boundary
+		#psi[-1-1,:] = 0 #north boundary
+		
 
 
 		#calculating velocities
@@ -888,11 +1041,23 @@ if __name__ == "__main__":
 		v[0,:] = 0 #southern border
 		v[-1,:] = 0 #northern border
 		
+		#Full-Slip Forward differences on N,S,E,W BC, like Holton grad.m and some other papers...
+		#Try for simplicity...
+		u[0,:] = -(psi[1,:] - psi[0,:])/dy #south
+		u[-1,:] = -(psi[-1,:] - psi[-2,:])/dy #north
+		v[:,0] = (psi[:,1] - psi[:,0])/dx #west
+		v[:,-1] = (psi[:,-1] - psi[:,-2])/dx #east
+		
+		
+		
+		
+		
+		
 		#no slip,
-		u[0,:] = 0 #southern border
-		u[-1,:] = 0 #northern border
-		v[:,0] = 0 #western border
-		v[:,-1] = 0 #eastern border
+		#u[0,:] = 0 #southern border
+		#u[-1,:] = 0 #northern border
+		#v[:,0] = 0 #western border
+		#v[:,-1] = 0 #eastern border
 		
 
 		
@@ -922,10 +1087,10 @@ if __name__ == "__main__":
 		
 		#Full-slip zeta BC
 		#since u0=u1 and uNY=uNY+1, zeta = -du/dy = 0 on northern and southern BCs
-		#zeta[0,:] = 0 #south
-		#zeta[-1,:] = 0 #north
-		#zeta[:,0] = 0 #west
-		#zeta[:,-1] = 0 #east
+		zeta[0,:] = 0 #south
+		zeta[-1,:] = 0 #north
+		zeta[:,0] = 0 #west
+		zeta[:,-1] = 0 #east
 		
 		
 		#No-slip zeta BC
@@ -933,20 +1098,20 @@ if __name__ == "__main__":
 		#zeta = -du/dy
 		#dv/dx = 0, because v = 0, due to no-flow across boundary
 		#south, along the entire edge
-		zeta[0,:] = (2/dy**2)*(psi[1,:]-psi[0,:])
+		#zeta[0,:] = (2/dy**2)*(psi[1,:]-psi[0,:])
 		#zeta[0,:] = -(u[1,:]-u[0,:])/dy #south
 		#north, along the entire edge
-		zeta[-1,:] = (2/dy**2)*(psi[-1,:]-psi[-2,:])
+		#zeta[-1,:] = (2/dy**2)*(psi[-1,:]-psi[-2,:])
 		#zeta[-1,:] = -(u[-1,:]-u[-2,:])/dy #north
 		
 		
 		#zeta = dv/dx
 		#-du/dy = 0, because u = 0, due to no-flow across boundary
 		#west, along entire egde
-		zeta[:,0] = (2/dx**2)*(psi[:,1]-psi[:,0]) #west
+		#zeta[:,0] = (2/dx**2)*(psi[:,1]-psi[:,0]) #west
 		#zeta[:,0] = (v[:,1]-v[:,0])/dx #west
 		#east along entire edge
-		zeta[:,-1] = (2/dx**2)*(psi[:,-1]-psi[:,-2]) #east
+		#zeta[:,-1] = (2/dx**2)*(psi[:,-1]-psi[:,-2]) #east
 		#zeta[:,-1] = (v[:,-1]-v[:,-2])/dx #east
 		
 		
@@ -990,8 +1155,15 @@ if __name__ == "__main__":
 
 		print("zeta S edge", zeta[0,0:4])
 		print("zeta N edge", zeta[-1,0:4])
+		print("zeta E edge", zeta[0:4,-1])
+		print("zeta W edge", zeta[0:4,0])
+		
 		print("psi S+1 edge", psi[1,0:4])
 		print("psi N-1 edge", psi[-2,0:4])
+		
+		
+		vspeed = np.sqrt(u*u+v*v)
+		print("max speed ", np.max(vspeed))
 		
 	#initial streamfunction
 	psi0 = PsiSolvePoissonJacobi(psi,zeta0,dx,dy,nx,ny,epstol,Ngc)
@@ -1000,11 +1172,11 @@ if __name__ == "__main__":
 	
 	
 	
-	#plot poisson solution of nabla^2psi = zeta
+	#plot initial poisson solution of nabla^2psi = zeta
 	fig00 = plt.figure() #If i do pcolor, then no need for 3d projection
 	ax00 = fig00.gca(projection='3d')
 	ax00.plot_surface(x, y, psi0)#, rstride=3, cstride=3, color='black')
-	ax00.set_title('Psi from Poisson nabla2psi = xi')
+	ax00.set_title('Initial Psi from Poisson nabla2psi = xi')
 	ax00.set_xlabel('x')
 	ax00.set_ylabel('y')
 	plt.show()
@@ -1027,7 +1199,8 @@ if __name__ == "__main__":
 	plt.show()
 
 
-
+	
+	#BVE final
 	#plt.switch_backend('QT4Agg')
 	fig = plt.figure(2)
 	ax = plt.gca()
@@ -1041,6 +1214,7 @@ if __name__ == "__main__":
 	plt.clabel(Czeta, fontsize=10, inline=1)#,fmt = '%1.0f')
 	plt.clabel(Cpsi, fontsize=10, inline=1)#,fmt = '%1.0f')
 	ax.quiver(x/1000,y/1000,u,v)
+	ax.legend()
 	plt.savefig('BVEboundingboxfinal.png')
 	plt.show()
 	
@@ -1054,19 +1228,26 @@ if __name__ == "__main__":
 	ax01.set_ylabel('y')
 	plt.show()
 	
+	
+	#plot zeta 
+	fig1, ax2 = plt.subplots(constrained_layout=True)
+	CS = ax2.contourf(x, y, zeta)
+	ax2.set_xlabel('x')
+	ax2.set_ylabel('y')
+	plt.show()
 		
 	#plot psi final
-	fig01 = plt.figure() #If i do pcolor, then no need for 3d projection
-	ax01 = fig01.gca(projection='3d')
-	ax01.plot_surface(x, y,psi)#, rstride=3, cstride=3, color='black')
-	ax01.set_title('psi final')
-	ax01.set_xlabel('x')
-	ax01.set_ylabel('y')
+	fig02 = plt.figure() #If i do pcolor, then no need for 3d projection
+	ax02 = fig02.gca(projection='3d')
+	ax02.plot_surface(x, y,psi)#, rstride=3, cstride=3, color='black')
+	ax02.set_title('psi final')
+	ax02.set_xlabel('x')
+	ax02.set_ylabel('y')
 	plt.show()
 	
 	
 	
-
+	
 	fig2 = plt.figure(3)
 	ax2 = plt.gca()
 	ax2.set_title('Barotropic Vorticity Equation')
