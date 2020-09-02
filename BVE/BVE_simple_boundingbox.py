@@ -668,35 +668,17 @@ def Jacobian(u,v,zeta,psi,beta):
 
 	"""
 
-	#I think these are Flux version tbh
+	#I think these are Flux version
 	Fmn = (\
 		(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
 		+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
 		+beta*v[1:ny-1,1:nx-1])
 
-
-
-	# #Arakawa Jacobian
-	# Ja = np.zeros((ny,nx))
-
-	# #I think actually, for Arakawa Jacobian, we need stream function psi,
-	# #and not JUST the u,v velocities that come from psi
-
-
-	# #temp2 will have psi*zeta terms???
-	# temp1 = (1/3)*(u[1:ny-1,1:nx-1]*zeta[2:ny,1:nx-1]-v[1:ny-1,1:nx-1]*zeta[1:ny-1,2:nx])*(1/(2*dx*2*dy))
-	# temp2 = (1/3)*(psi[
-	# temp3 = 0
-	# #each term in each (1/3) term, will have 1/(2dx2dy) factor i'm pretty sure
-	# Ja[1:ny-1,1:nx-1] = temp1+temp2+temp3
-
-
-
 	return Fmn
 	
 	
 	
-def ArakawaJacobian():
+def ArakawaJacobian(psi,zeta,dx,dy,nx,ny,beta,v):
 	"""
 	To update relative vorticity zeta
 	
@@ -718,56 +700,131 @@ def ArakawaJacobian():
 	
 	"""
 	
-	#I think these are Flux version tbh
-	Fmn = (\
-		(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
-		+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
-		+beta*v[1:ny-1,1:nx-1])
+	
+	#https://dspace.library.uvic.ca/bitstream/handle/1828/1218/Final THESIS.pdf?sequence=1
+	#J1,J2,J3 aka Jpp, Jpx, Jxp
+	J1 = np.zeros((ny,nx))
+	J2 = np.zeros((ny,nx))
+	J3 = np.zeros((ny,nx))
+	JA = np.zeros((ny,nx))
+	for j in range(1,ny-1):
+		for i in range(1,nx-1):
+			J1[j,i] = (1/(4*dx**2))*(
+								(psi[j,i+1]-psi[j,i-1])*(zeta[j+1,i]-zeta[j-1,i])
+								-(zeta[j,i+1]-zeta[j,i-1])*(psi[j+1,i]-psi[j-1,i]))
+								
+								
+			J2[j,i] = (1/(4*dx**2))*(psi[j,i+1]*(zeta[j+1,i+1]-zeta[j-1,i+1])
+								-psi[j,i-1]*(zeta[j+1,i-1]-zeta[j-1,i-1])
+								-psi[j+1,i]*(zeta[j+1,i+1]-zeta[j+1,i-1])
+								+psi[j-1,i]*(zeta[j-1,i+1]-zeta[j-1,i-1])
+								)
+								
+			J3[j,i] = (1/(4*dx**2))*(zeta[j+1,i]*(psi[j+1,i+1]-psi[j+1,i-1])
+								-zeta[j-1,i]*(psi[j-1,i+1]-psi[j-1,i-1])
+								-zeta[j,i+1]*(psi[j+1,i+1]-psi[j-1,i+1])
+								+zeta[j,i-1]*(psi[j+1,i-1]-psi[j-1,i-1])
+								)
 	
 	
+	JA = (1/3)*(J1+J2+J3) + beta*v[:,:]
+	Fmn = JA
 	
-	# #Arakawa Jacobian
-	# Ja = np.zeros((ny,nx))
-	
-	# #I think actually, for Arakawa Jacobian, we need stream function psi,
-	# #and not JUST the u,v velocities that come from psi
-	
-	
-	# #temp2 will have psi*zeta terms???
-	# temp1 = (1/3)*(u[1:ny-1,1:nx-1]*zeta[2:ny,1:nx-1]-v[1:ny-1,1:nx-1]*zeta[1:ny-1,2:nx])*(1/(2*dx*2*dy))
-	# temp2 = (1/3)*(psi[
-	# temp3 = 0
-	# #each term in each (1/3) term, will have 1/(2dx2dy) factor i'm pretty sure
-	# Ja[1:ny-1,1:nx-1] = temp1+temp2+temp3
-
-
-
-	return 0
+	return Fmn
 
 
 
 
 def nabladotv(u,v,nx,ny,dx,dy):
 	"""
-	#divergne should be 0??? right?? so calculate it and plot!
+	Divergence should be 0 for BVE,
+	nabla.v =0
+	
+	Test it out
 	Should maybe be centered differences??
+	And maybe on edges, do forward differences
 	"""
 	
 	
 	divv = (u[:,1:nx-1]-u[:,0:nx-2])/dx + (v[1:ny-1,:]-v[0:ny-2,:])/dy
 
 	return divv
+	
 
-def RobertAsselinFilter():
+
+
+def SimpleFilter(zetanew,zeta,zetaold):
 	"""
+	Filters out leapfrog computational mode
+	Simple filter, from lec12.pdf
+	
+	It actually filters the INTERMEDIATE step, zeta, instead of zetanew!
+	And then the filtered zeta, will be used for the next timestep
+	"""
+	zeta = 0.5*(zetanew+zetaold)
+	
+	return zeta
+	
+	
+
+
+def RobertAsselinFilter(zetanew,zeta,zetaold):
+	"""
+	Robert-Asselin filter
 	Often used with Leap-frog scheme
 	http://weather.ou.edu/~ekalnay/NWPChapter3/Ch3_2_4.html
 	
 	
+	We filter on zeta, NOT zetanew... it's the current intermediate step, zeta, that will be filtered
+
+	
+	http://www.scottsarra.org/math/papers/Shawn%20Cheeks%20Math%20Capstone%202015.pdf
+	First do regular leapfrog integration
+	Then apply the filter
+	F(t)tbar = F(t) + 0.5*nu*(F(t-dt)bar - 2*F(t) + F(t+dt))
+	
+	
+	#https://www.mathematics.pitt.edu/sites/default/files/SurveyTimeFilters1_technical-report.pdf
+	#RA-leapfrog
+	#u is filtered, v is unfiltered
+	#vnew = uold + 2*dt*F(v)
+	#u = v + 0.5*nu*(vnew-2*v+uold)
+	#So, you can actually do it, without much intrusion at all, and I don't think another array is needed
+
+	
+	
 	"""
+	
 
+	nu_filter = 0.1
+	
+	
+	#apply filter to zeta
+	#un = vn + (nu/2)*(vn+1-2vn+un-1)
+	#zeta[1:ny-1,1:nx-1] = zetav[1:ny-1,1:nx-1] + (nu_filter/2)*(zetavnew[1:ny-1,1:nx-1]-2*zetav[1:ny-1,1:nx-1]+zetaold[1:ny-1,1:nx-1])
+	zeta[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] + (nu_filter/2.0)*(zetanew[1:ny-1,1:nx-1]-2.0*zeta[1:ny-1,1:nx-1]+zetaold[1:ny-1,1:nx-1])
+		
+	
+	#now, we have
+	#filtered zeta
+	#unfiltered zetaold
+	#unfiltered zetanew
 
-	return psi
+	#Next time, 
+	#zetaold = filtered zeta
+	#zeta = unfiltered zetanew
+	#
+	
+	
+	#https://maths.ucd.ie/~plynch/LECTURE-NOTES/NWP-2004/NWP-CH03-2-3-P4.pdf
+	#Unf = Un + gamma*(Un+1-2Un+Un-1f)
+	#So, for this only, I really only need Un-1f maybe...
+	#Actually, on RHS, only 3 unique matrices are needed...
+	#Maybe then the filter doesn't actually require extra memory data storage???
+	#Or maybe it DOES require some intermediate matrix data storage... but, maybe not 2, as I do now..
+	
+	
+	return zeta
 
 
 
@@ -798,6 +855,17 @@ def NoSlipBCvorticity(zeta,psi,dx,dy):
 	
 	
 	
+
+
+def AddOrography(zeta,u,v,h,f,H,dx,dy):
+	"""
+	Centered differences for dh/dx and dh/dy
+	"""
+	oroterm = -(f/H)*(u[1:ny-1,1:nx-1]*(h[:,2:nx]-h[:,0:nx-2])/(2*dx)+v[1:ny-1,1:nx-1]*(h[2:ny,:]-h[0:ny-2,:])/(2*dy))
+	
+	
+	return oroterm
+
 
 
 
@@ -878,7 +946,9 @@ if __name__ == "__main__":
 	time_end = 3*3600 				#seconds
 	dt = 100 #seconds
 	t = 0
-
+	nt = 0
+	
+	#not NEEDED, but, I think psi array should probably be nx+1,ny+1, or, velocity should be nx-1,ny-1
 	psi = np.zeros((ny,nx),dtype=np.float64)
 	dypsi = np.zeros((ny,nx),dtype=np.float64)
 	dxpsi = np.zeros((ny,nx),dtype=np.float64)
@@ -890,8 +960,29 @@ if __name__ == "__main__":
 
 
 
+	#==============================================
+	#Add orography
+	H = 8000
+	h = np.zeros((ny,nx),dtype=np.float64)
+	h0 = 500
+	x0m = 0
+	y0m = 0
+	f = 1e-4
+	r = 500*1000 #500 km radius
+	h[:,:] = h0*np.exp(-((x-x0m)**2+(y-y0m)**2)/(2*r**2))
+	
+	
+	
+	
+	#===============================================
+
+
 
 	#Initial conditions from psi Rossby-haurwitz
+	#What should scales be?
+	#zeta is around 1e-5 right?
+	#
+	
 	#Rossby wave-packets
 	#psi[:,:] = np.cos(k1*x-w*t)*sin(k2*y)
 	#psi[:,:] = np.cos(k*x)*np.sin(m*y)
@@ -954,7 +1045,20 @@ if __name__ == "__main__":
 	u[-1,:] = -(psi[-1,:] - psi[-2,:])/dy #north
 	v[:,0] = (psi[:,1] - psi[:,0])/dx #east
 	v[:,-1] = (psi[:,-1] - psi[:,-2])/dx #west
-
+	
+	
+	#Rescale velocity
+	#done e.g here https://dspace.library.uvic.ca/bitstream/handle/1828/1218/Final%20THESIS.pdf?sequence=1
+	#let's find max velocity
+	vspeed = np.sqrt(u*u+v*v)
+	vspeedmax = np.max(vspeed) #around 1e-6m/s
+	vspeedScale = 5 #5m/s
+	#k*vspeedmax = vspeedScale
+	#k = vspeedScale/vspeedmax
+	kspeedscale = vspeedScale/vspeedmax
+	u = kspeedscale*u
+	v = kspeedscale*v
+	
 	
 	
 	#We have 3 sets of zetas here, one is initial, I would assume? zeta0
@@ -962,7 +1066,7 @@ if __name__ == "__main__":
 	#zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
 	zeta0 = np.zeros((ny,nx),dtype=np.float64)
 	zeta = zeta0.copy()
-	zetan = zeta0.copy()
+	zetanew = zeta0.copy()
 	
 	for i in range(1,nx-1):
 		for j in range(1,ny-1):
@@ -979,7 +1083,7 @@ if __name__ == "__main__":
 	#zeto0 is set to a gaussian it
 	#zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
 	zeta = zeta0.copy()
-	zetan = zeta0.copy()
+	zetanew = zeta0.copy()
 
 
 	
@@ -998,11 +1102,11 @@ if __name__ == "__main__":
 	print("psi[:5,0]", psi[:5,0])
 	print("psi[:5,-1]", psi[:5,-1])
 	
-	
-	print("ARRAY TEST")
-	Anytest = np.array([1,2,3,4,5,6,7,8,9])
-	print(Anytest[-1],Anytest[-2])
 
+	
+	#Filter arrays... probably not needed
+	zetav = np.zeros((ny,nx),dtype=np.float64)
+	zetavnew = np.zeros((ny,nx),dtype=np.float64)
 	
 	
 	#Ghost cells
@@ -1011,11 +1115,87 @@ if __name__ == "__main__":
 	#Boundary conditions from beginning
 	#zeta = NoSlipBCvorticity(zeta,psi,dx,dy)
 	
+	
+	
+	#====================================================================================
+	#Main loop. Integrate forward in time
+	
+	
+	#First step
+	#Euler forward is easy to implement...
+	#If you can accept the large first error?
+	#Alternatively, you can use, Euler-Backwards (Matsuno) step on the first?
+	#https://maths.ucd.ie/~plynch/LECTURE-NOTES/NWP-2004/NWP-CH03-2-3-P4.pdf
+	#You're basically doing a leapfrog scheme with half-step too i think...
+	
+	
+	#Euler Forward
+	
+	t+= dt
+		
+	#Calculate streamfunction psi
+	psi = PsiSolvePoissonJacobi(psi,zeta,dx,dy,nx,ny,epstol,Ngc)
+	
+	#calculating velocities
+	#only in interior
+	u,v = CalcVelocity(psi,dx,dy)
+	
+	#f[y,x], boundary conditions for velocity
+	#no-flow across boundary
+	u[:,0] = 0 #western border
+	u[:,-1] = 0 #eastern border
+	v[0,:] = 0 #southern border
+	v[-1,:] = 0 #northern border
+	
+	#Full-Slip Forward differences on N,S,E,W BC, like Holton grad.m and some other papers...
+	#Try for simplicity...
+	u[0,:] = -(psi[1,:] - psi[0,:])/dy #south
+	u[-1,:] = -(psi[-1,:] - psi[-2,:])/dy #north
+	v[:,0] = (psi[:,1] - psi[:,0])/dx #west
+	v[:,-1] = (psi[:,-1] - psi[:,-2])/dx #east
+	
+
+	#Full-slip zeta BC
+	#since u0=u1 and uNY=uNY+1, zeta = -du/dy = 0 on northern and southern BCs
+	zeta[0,:] = 0 #south
+	zeta[-1,:] = 0 #north
+	zeta[:,0] = 0 #west
+	zeta[:,-1] = 0 #east
+	
+
+	#Updating relative vorticity zeta
+	Fmn = ArakawaJacobian(psi,zeta,dx,dy,nx,ny,beta,v)
+	integralFmn = np.sum(Fmn)
+	print("Fmn integral ",integralFmn)
+	
+	
+	#zeta[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] - dt*Fmn #for normal jacobian
+	zetanew[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] - dt*Fmn[1:ny-1,1:nx-1] #for Arakawa jacobian
+
+	print("zeta S edge", zeta[0,0:4])
+	print("zeta N edge", zeta[-1,0:4])
+	print("zeta E edge", zeta[0:4,-1])
+	print("zeta W edge", zeta[0:4,0])
+	
+	print("psi S+1 edge", psi[1,0:4])
+	print("psi N-1 edge", psi[-2,0:4])
+	
+	
+	vspeed = np.sqrt(u*u+v*v)
+	print("max speed ", np.max(vspeed))
+	
 
 	while t < time_end:
 		
+		#Do a copy, but just assigning may also be work
+		#old zeta, is equal to the intermediate zetacurrent we had in previous step
+		zetaold = zeta.copy()
+		#Current zeta, is equal to the zeta we just had...
+		zeta = zetanew.copy()
+
+
 		print(t)
-		
+		nt += 1
 		t+= dt
 		
 		#Calculate streamfunction psi
@@ -1047,10 +1227,6 @@ if __name__ == "__main__":
 		u[-1,:] = -(psi[-1,:] - psi[-2,:])/dy #north
 		v[:,0] = (psi[:,1] - psi[:,0])/dx #west
 		v[:,-1] = (psi[:,-1] - psi[:,-2])/dx #east
-		
-		
-		
-		
 		
 		
 		#no slip,
@@ -1137,22 +1313,66 @@ if __name__ == "__main__":
 
 
 
-
-
 		#Updating relative vorticity zeta
 		#forward euler, should be leapfrog
 		#Fmn = (\
 		#	(u[1:ny-1,2:nx]*zeta[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta[1:ny-1,0:nx-2])/(2*dx)\
 		#	+(v[2:ny,1:nx-1]*zeta[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta[0:ny-2,1:nx-1])/(2*dy)\
 		#	+beta*v[1:ny-1,1:nx-1])
-		Fmn = Jacobian(u,v,zeta,psi,beta)
-		integralFmn = np.sum(Fmn)
-		print("Fmn integral ",integralFmn)
+		#Fmn = Jacobian(u,v,zeta,psi,beta)
 		
 		
+		
+		#Fmn = ArakawaJacobian(psi,zeta,dx,dy,nx,ny,beta,v) Euler forward
+		#Fmn = ArakawaJacobian(psi,zeta,dx,dy,nx,ny,beta,v) #Leapfrog current intermediate, actually just same
 
-		zeta[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] - dt*Fmn
 
+		#Euler-forward
+		#zeta[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] - dt*Fmn #for normal jacobian
+		#zeta[1:ny-1,1:nx-1] = zeta[1:ny-1,1:nx-1] - dt*Fmn[1:ny-1,1:nx-1] #for Arakawa jacobian
+		
+		
+		#Leapfrog
+		#New = Old + 2*dt*current
+		#zetanew[1:ny-1,1:nx-1] = zetaold[1:ny-1,1:nx-1] + 2*dt*(-Fmn[1:ny-1,1:nx-1])
+		
+
+		
+		
+		#===============================================
+		#Filtering zeta
+		
+		#ArakawaJacobian will use zetav basically, filtered, to give F(v)
+		#Fmnv = ArakawaJacobian(psi,zetav,dx,dy,nx,ny,beta,v)
+		Fmn = ArakawaJacobian(psi,zeta,dx,dy,nx,ny,beta,v)
+		
+		#RA-leapfrog
+		#new_filter = old + 2*dt*F(current_filter)
+		#vn+1 = un-1 + 2*dt*F(vn)
+		#zetavnew[1:ny-1,1:nx-1] = zetaold[1:ny-1,1:nx-1] + 2*dt*(-Fmnv[1:ny-1,1:nx-1])
+		zetanew[1:ny-1,1:nx-1] = zetaold[1:ny-1,1:nx-1] + 2*dt*(-Fmn[1:ny-1,1:nx-1]+
+								-(f/H)*(u[1:ny-1,1:nx-1]*(h[1:ny-1,2:nx]-h[1:ny-1:,0:nx-2])/(2*dx)+v[1:ny-1,1:nx-1]*(h[2:ny,1:nx-1]-h[0:ny-2,1:nx-1])/(2*dy)))
+		
+		
+		#Apply filter
+		zeta = RobertAsselinFilter(zetanew,zeta,zetaold)
+		
+		
+		
+		#Simple filter
+		#if nt == 20:
+		
+		#	zeta = SimpleFilter(zetanew,zeta,zetaold)
+		
+		
+		
+		
+		#=========================================================
+		#Output, terminal, files, etc
+		
+		
+		
+		
 		print("zeta S edge", zeta[0,0:4])
 		print("zeta N edge", zeta[-1,0:4])
 		print("zeta E edge", zeta[0:4,-1])
@@ -1162,8 +1382,34 @@ if __name__ == "__main__":
 		print("psi N-1 edge", psi[-2,0:4])
 		
 		
+		
 		vspeed = np.sqrt(u*u+v*v)
 		print("max speed ", np.max(vspeed))
+		
+		#Enstrophy? Or energy? Can't remember
+		integralFmn = np.sum(Fmn)
+		print("Fmn integral ",integralFmn)
+		
+		
+		#Conserved quantities?
+		#According to Holton,
+		#Enstrophy?
+		#Mean vorticity?
+		#Kinetic Energy?
+		#maybe only conserved in the limit as dt -> 0,
+		#so, theoretically conserved, but maybe leapfrog introduces errors,
+		#then you could say, it's not the Jacobian scheme error per say,
+		#it's a leapfrog error, which we can't do much about in the jacobian
+		
+		#Mean kinetic energy should be conserved
+		KEmean = np.sum(0.5*vspeed)/(ny*nx)
+		Enstrophy = np.sum(zeta*zeta/2)
+		zetamean = np.sum(zeta)/(ny*nx)
+		print("mean KE ", KEmean)
+		print("Enstrophy ", Enstrophy)
+		print("mean zeta ", zetamean)
+		
+		
 		
 	#initial streamfunction
 	psi0 = PsiSolvePoissonJacobi(psi,zeta0,dx,dy,nx,ny,epstol,Ngc)
