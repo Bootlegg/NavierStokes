@@ -249,8 +249,6 @@ def FFTPoisson(nx,ny,Lx,dy,zeta,psi):
 	# %psi(:,Nx) = psi(:,1);
 
 	
-	#I matlab, så er dim = 1 vs 2
-	#I numpy, starter vi fra 0? Eller fra 1?
 	psiT = np.zeros_like(zeta)
 	nxl = nx-1
 	nyl = ny-1
@@ -284,7 +282,7 @@ def FFTPoisson(nx,ny,Lx,dy,zeta,psi):
 	psi[:,nx-1] = psi[:,0]
 	
 	return psi
-def pressure_poisson_periodic(p,b, dx, dy):
+def poisson_periodic(p,b, dx, dy):
 	pn = np.empty_like(p)
 	
 	for q in range(500):
@@ -318,7 +316,7 @@ def pressure_poisson_periodic(p,b, dx, dy):
 	return p
 
 def gradHolton(u,v,psi,dx,dy,nx,ny):
-		# % Take forward differences on top and bottom edges
+	# % Take forward differences on top and bottom edges
 	# dely(1,:) = (P(2,:) - P(1,:))/dy;
 	# dely(n,:) = (P(n,:) - P(n-1,:))/dy;
 
@@ -339,9 +337,7 @@ def gradHolton(u,v,psi,dx,dy,nx,ny):
 
 	# delx(:,2:p-1)= (P(:,3:p)-P(:,1:p-2))/(2*dx);
 	
-	#OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOPS.........
-	#I accidentally, reversed them!
-	#it's CROSS differentials! u = -dpsi/dy.... OOPS, LMAO, n00b shit
+	
 	delx = np.zeros_like(v)
 	dely = np.zeros_like(u)
 	
@@ -1334,7 +1330,7 @@ if __name__ == "__main__":
 	thismanager.window.wm_geometry("-1500+0")
 
 	
-	#Er det mon nogen leapfrog scheme conditions jeg ikke overholder??
+	#Er det mon nogen leapfrog scheme conditions jeg ikke overholder
 	
 	Lx = 6000#6000 #km
 	Ly = 3000#3000 #km
@@ -1441,7 +1437,7 @@ if __name__ == "__main__":
 	Amag = 10**(7)
 	psi[:,:] = Amag*np.cos(k1*x)*np.sin(k2*y) #Det er solution til equatorial BVE? EBVE? Den har ingen beta? Eller er beta sat til = 1? natural units?
 	#men, de bruger xi i 2.74, mens de bruger zeta i 4.1...
-	#så måske, zeta = xi+f, men ikke sure?
+	#så måske, zeta = xi+f, men ikke sure
 	#YUP! OKAY!
 	#De bruger zeta = xi + f i 2.87
 	#Så, jeg tror, 4.1, det er MED coriolis f
@@ -1766,11 +1762,11 @@ if __name__ == "__main__":
 		#what about...
 		#Making a "safer" convergence for Jacobi??? like, smaller pseudo timestep?
 		
-		#Hmmm... can I take an example, and explode it?
+		#Hmmm... can I take an example, and explode it
 		#Like, take Lorena Barbas example with Poisson, and explode it, either with large b values, or large dx and dy values...
 		
 		#psi = PsiSolvePoissonJacobiChannel(psizeros,zeta,dx,dy,nx,ny,epstol,Ngc,)
-		psi = pressure_poisson_periodic(psi, zeta, dx, dy)
+		psi = poisson_periodic(psi, zeta, dx, dy)
 		#psi = FFTPoisson(nx,ny,Lx,dy,zeta,psi)
 		psi = psi+U0*(Ly/2*1000 -y)
 		#psi = PsiSolvePoissonJacobi(psi,zeta,dx,dy,nx,ny,epstol,Ngc)
@@ -1796,11 +1792,11 @@ if __name__ == "__main__":
 		
 		v,u = gradHolton(u,v,psi,dx,dy,nx,ny)
 		
-		#Try, full-slip Bcs,
+		#Full-slip Bcs,
 		u[0,:] = u[1,:]
 		u[ny-1,:] = u[ny-1,:]
 		
-		#Kan jeg måske her, indføre, full-slip BCs?
+
 		
 		
 		#dt = 0.8*dx/(10+np.max(vspeed))
@@ -1884,8 +1880,8 @@ if __name__ == "__main__":
 		#Called eddy diffusitivity, units m^2s^-1.
 		
 		
-		#Is there orography induced vorticity? If i start with u[:,:] = 20, and zeta = 0? And thus, psi = 0?
-		#Then due to orography, do we get zeta,psi, etc?
+		#Is there orography induced vorticity? If i start with u[:,:] = 20, and zeta = 0? And thus, psi = 0
+		#Then due to orography, do we get zeta,psi, etc
 		
 		nu_eddy=1000
 		zetanew[1:ny-1,0:nx] = zetaold[1:ny-1,0:nx] + 2*dt*(-Fmn[1:ny-1,0:nx])
@@ -2028,8 +2024,8 @@ if __name__ == "__main__":
 	C = ax00.contour(x/1000,y/1000,psi0,4,colors='black')
 	ax00.set_title('Initial Psi from Poisson solver nabla2psi = xi')
 	ax00.quiver(x/1000,y/1000,u,v)
-	ax00.set_xlabel('x')
-	ax00.set_ylabel('y')
+	ax00.set_xlabel('x/km')
+	ax00.set_ylabel('y/km')
 	plt.show()
 
 
@@ -2040,10 +2036,11 @@ if __name__ == "__main__":
 	ax003 = fig003.gca()
 	#ax003.plot_surface(x, y, psi)#, rstride=3, cstride=3, color='black')
 	C = ax003.contour(x/1000,y/1000,psi_exact_final,4,colors='black')
-	ax003.set_title('Initial Psi Rossby wave packet exact expression')
+	ax003.set_title('Initial $\psi$ Rossby wave packet')
 	ax003.quiver(x/1000,y/1000,u,v)
-	ax003.set_xlabel('x')
-	ax003.set_ylabel('y')
+	ax003.set_xlabel('x/km')
+	ax003.set_ylabel('y/km')
+	plt.savefig('BVEInitialPsiRossbyWavePacket.png')
 	plt.show()
 	
 	
@@ -2054,8 +2051,8 @@ if __name__ == "__main__":
 	thismanager.window.wm_geometry("-1500+0")
 	ax0 = fig0.add_subplot(111)
 	ax0.set_title('BVE Initial $\zeta$ configuraton')
-	ax0.set_xlabel('x')
-	ax0.set_ylabel('y')
+	ax0.set_xlabel('x/km')
+	ax0.set_ylabel('y/km')
 	#ax.quiver(x/1000,y/1000,u,v)
 	#C = ax0.contour(x/1000,y/1000,zeta0*10**7,8,colors='black')
 	#Czeta = ax0.contour(x/1000,y/1000,zeta_exact_initial,8,colors='black',label="zeta_init")
@@ -2094,6 +2091,7 @@ if __name__ == "__main__":
 	ax001.set_title('Orography')
 	ax001.set_xlabel('x/km')
 	ax001.set_ylabel('y/km')
+	ax001.set_zlabel('h/m')
 	plt.savefig('BVEboundingboxorography.png')
 	plt.show()
 
@@ -2106,8 +2104,8 @@ if __name__ == "__main__":
 	thismanager.window.wm_geometry("-1500+0")
 	ax = fig.add_subplot(111)
 	ax.set_title('BVE Exact $\psi$ final vs initial')
-	ax.set_xlabel('x')
-	ax.set_ylabel('y')
+	ax.set_xlabel('x/km')
+	ax.set_ylabel('y/km')
 	#ax.quiver(x/1000,y/1000,u,v)
 	#C = ax.contour(x/1000,y/1000,zeta*10**7,8,colors='black')
 	#Czeta = ax.contour(x/1000,y/1000,zeta,6,colors='black')
@@ -2136,8 +2134,8 @@ if __name__ == "__main__":
 	thismanager.window.wm_geometry("-1500+0")
 	ax = fig.add_subplot(111)
 	ax.set_title('BVE Exact $\zeta$ final vs initial')
-	ax.set_xlabel('x')
-	ax.set_ylabel('y')
+	ax.set_xlabel('x/km')
+	ax.set_ylabel('y/km')
 	#ax.quiver(x/1000,y/1000,u,v)
 	#C = ax.contour(x/1000,y/1000,zeta*10**7,8,colors='black')
 	#Czeta = ax.contour(x/1000,y/1000,zeta,6,colors='black')
@@ -2168,8 +2166,8 @@ if __name__ == "__main__":
 	thismanager.window.wm_geometry("-1500+0")
 	ax = plt.gca()
 	ax.set_title('BVE final $\psi$ numerical vs initial exact')
-	ax.set_xlabel('x')
-	ax.set_ylabel('y')
+	ax.set_xlabel('x/km')
+	ax.set_ylabel('y/km')
 	#ax.quiver(x/1000,y/1000,u,v)
 	#C = ax.contour(x/1000,y/1000,zeta*10**7,8,colors='black')
 	#Czeta = ax.contour(x/1000,y/1000,zeta,6,colors='black')
@@ -2205,8 +2203,8 @@ if __name__ == "__main__":
 	labels = ['Final num','Final exact']
 	plt.legend(lines, labels)
 	ax01.set_title('$\zeta$ final numerical')
-	ax01.set_xlabel('x')
-	ax01.set_ylabel('y')
+	ax01.set_xlabel('x/km')
+	ax01.set_ylabel('y/km')
 	plt.savefig('BVEzetafinal.png')
 	plt.show()
 	
@@ -2225,9 +2223,10 @@ if __name__ == "__main__":
 	#lines = [ Czeta1.collections[-1], Czeta2.collections[-1]]
 	#labels = ['Final','Initial']
 	#plt.legend(lines, labels)
-	ax01.set_title('Zeta initial exact')
-	ax01.set_xlabel('x')
-	ax01.set_ylabel('y')
+	ax01.quiver(x/1000,y/1000,u,v,color="black")
+	ax01.set_title('$\zeta$ initial Rossby wave packet')
+	ax01.set_xlabel('x/km')
+	ax01.set_ylabel('y/km')
 	plt.savefig('BVEzetainitial.png')
 	plt.show()
 	
@@ -2257,8 +2256,8 @@ if __name__ == "__main__":
 	labels = ['Final num','Final exact']
 	plt.legend(lines, labels)
 	ax02.set_title('$\psi$ final')
-	ax02.set_xlabel('x')
-	ax02.set_ylabel('y')
+	ax02.set_xlabel('x/km')
+	ax02.set_ylabel('y/km')
 	plt.savefig('BVEpsifinal.png')
 	plt.show()
 	
