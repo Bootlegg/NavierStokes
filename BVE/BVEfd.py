@@ -26,8 +26,30 @@ psi = 0
 nablapsi.n = 0 (no-slip on side walls)
 
 
+https://pdfs.semanticscholar.org/c937/d58642e376a098b2b319783cd121c7fbbfe9.pdf
+dnabla^2psi/dt = -J(psi,nabla^2psi + f)+F+D(psi)
+F is forcing, D is either diffusion or bottom-friction
+
+put psi = 0 on the boundary to get dpsi/ds = 0 on the boundary, this is non-inflow boundary condition for
+a bounded basin
+also, non-slip condition dpsi/dn = 0
+
+http://empslocal.ex.ac.uk/people/staff/dbs202/cat/courses/MTMW14/notes2005.pdf
+Free-slip conditions on north and south wall, v = 0 on boundaries, no flow through the boundaries
+also, du/dy = 0
+This leads to constant stream function (can just set it to 0) and also zero relative vorticity on the boundaries
+
+
+
 DIfferent methods to solve the Poisson equation
 Should add some terms to the BVE, like vorticity drag, forcing, viscosity
+
+
+
+Sources:
+Dale R Durran book
+Holton book
+lec12 pdf
 
 
 
@@ -59,6 +81,9 @@ I may have translated matlab code wrong, forgot python numpy slicing doesn't inc
 
 
 Add in Arawakian grid?
+
+
+
 
 
 """
@@ -163,10 +188,14 @@ def SolvePoisson(psi,zeta):
 		#psi[0,:] = 0 
 		#psi[-1,:] = 0
 	
+	
+	#I think here, we should return psi, instead of doing it implicitly....
+	#so, change the way the method works...
+	#return psi
 		
 def FirstStepZeta(zeta,zetan,u,v,beta):
 	"""
-	Euler-forward probably?
+	Euler-forward difference for first step. Holton pg 467
 	
 	Denne her kan jeg indføre nogle [:] til, i stedet for[1:ny-1] fx.... tror godt vi kan gå HELT UD til boundaries
 	Men lad os starte et sted dog
@@ -209,19 +238,22 @@ def UpdateZetaLeapFrog(zetan,zeta0,zeta,u,v,beta):
 	Men lad os starte et sted dog
 	
 	Hmm... jeg skal faktisk også have old velocities?:O
+	
+	
+	
 	"""
 	zetan[1:ny-1,1:nx-1] = zeta0[1:ny-1,1:nx-1]-2*dt*(\
 		(u[1:ny-1,2:nx]*zeta0[1:ny-1,2:nx]-u[1:ny-1,0:nx-2]*zeta0[1:ny-1,0:nx-2])/(2*dx)\
 		+(v[2:ny,1:nx-1]*zeta0[2:ny,1:nx-1]-v[0:ny-2,1:nx-1]*zeta0[0:ny-2,1:nx-1])/(2*dy)\
 		+beta*v[1:ny-1,1:nx-1])
 	
-	#x = 0, x = L borders
+	#x = 0
 	zetan[1:ny-1,0] = zeta0[1:ny-1,0]-2*dt*(\
 		(u[1:ny-1,1]*zeta0[1:ny-1,1]-u[1:ny-1,-1]*zeta0[1:ny-1,-1])/(2*dx)\
 		+(v[2:ny,0]*zeta0[2:ny,0]-v[0:ny-2,0]*zeta0[0:ny-2,0])/(2*dy)\
 		+beta*v[1:ny-1,0])
 	
-	
+	#x = L borders
 	zetan[1:ny-1,-1] = zeta0[1:ny-1,-1]-2*dt*(\
 		(u[1:ny-1,0]*zeta0[1:ny-1,0]-u[1:ny-1,-2]*zeta0[1:ny-1,-2])/(2*dx)\
 		+(v[2:ny,-1]*zeta0[2:ny,-1]-v[0:ny-2,-1]*zeta0[0:ny-2,-1])/(2*dy)\
@@ -234,13 +266,13 @@ def UpdateZetaLeapFrog(zetan,zeta0,zeta,u,v,beta):
 	
 	
 	
-	#y = 0, y = L borders
+	#y = 0
 	zetan[0,1:nx-1] = zeta0[0,1:nx-1]-2*dt*(\
 		(u[0,2:nx]*zeta0[0,2:nx]-u[0,0:nx-2]*zeta0[0,0:nx-2])/(2*dx)\
 		+(v[1,1:nx-1]*zeta0[1,1:nx-1]-v[-1,1:nx-1]*zeta0[-1,1:nx-1])/(2*dy)\
 		+beta*v[0,1:nx-1])
 	
-	
+	#y = L borders
 	zetan[-1,1:nx-1] = zeta0[-1,1:nx-1]-2*dt*(\
 		(u[-1,2:nx]*zeta0[-1,2:nx]-u[-1,0:nx-2]*zeta0[-1,0:nx-2])/(2*dx)\
 		+(v[0,1:nx-1]*zeta0[0,1:nx-1]-v[-2,1:nx-1]*zeta0[-2,1:nx-1])/(2*dy)\
@@ -309,6 +341,11 @@ def divflux(P,u,v,dx,dy):
 	#Interessant det der sker ved boundary periodic… vi springer en gridpoint over I centered differences, look it…
 
 def Damping4(Dk4,nx,ny,U):
+	"""
+	Where does the damping come from? I don't remember now
+	
+	"""
+
 	numdif = np.zeros((ny,nx));          
 
 	#Do smoothing in y space for 1st derivative zero at boundaries
@@ -366,8 +403,11 @@ def CalcVelocity(u,v,dxpsi,dypsi,psi,dx,dy):
 	#dxpsi[:,1:-2]= (psi[:,2:-1]-psi[:,0:-3])/(2*dx)  #centered difference
 
 	
+	#y = 0
 	dypsi[0,:] = (psi[1,:] - psi[0,:])/dy
+	#y = L
 	dypsi[-1,:] = (psi[-1,:] - psi[-2,:])/dy
+	#Interior
 	dypsi[1:-1,:] = (psi[2:,:]-psi[0:-2,:])/(2*dy)  #Centered difference
 
 	
@@ -520,13 +560,16 @@ if __name__ == "__main__":
 	Av4 = 10**(-6)
 	A = 10**(-4)
 	#initial vorticity and streamfunction
-
+	
+	
+	#We have 3 sets of zetas here, one is initial, I would assume? zeta0
+	#zeto0 is set to a gaussian it
 	zeta0 = np.array(A*np.exp(-2*(k**2*x**2+m**2*y**2)),dtype=np.float64)
 	zeta = zeta0
 	zetan = zeta0
 	#time integration parameters					#hours
 	time_end = 3*3600 				#second
-	dt = 100
+	dt = 100 #seconds?
 
 	psi = np.zeros((ny,nx),dtype=np.float64)
 	dypsi = np.zeros((ny,nx),dtype=np.float64)
@@ -609,10 +652,12 @@ if __name__ == "__main__":
 	
 	#From animation function,
 	for timestep in range(100):
+	
 		t+=dt
 		zeta0 = zeta.copy()
 		zeta = zetan.copy()
 		
+		#Try without the damping
 		numdif = Damping4(Av4,nx,ny,zeta0)
 		
 		#UpdateZetaLeapFrog(zetan,zeta0,zeta,u,v,beta)
